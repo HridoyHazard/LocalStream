@@ -22,6 +22,7 @@ import {
 } from '@/lib/watch-progress';
 import { detailsHref, episodeCode, watchHref } from '@/lib/media-links';
 import PageHeader from '@/components/ui/PageHeader';
+import SectionHeading from '@/components/ui/SectionHeading';
 import MediaCard from '@/components/media/MediaCard';
 import EmptyState from '@/components/ui/EmptyState';
 import Poster from '@/components/media/Poster';
@@ -188,15 +189,12 @@ export default function HistoryView() {
           <div className="space-y-12">
             {continueWatching.length > 0 ? (
               <section>
-                <div className="mb-5 flex items-end justify-between gap-4">
-                  <div>
-                    <p className="eyebrow">Pick up where you left off</p>
-                    <h2 className="section-heading mt-2">Continue watching</h2>
-                  </div>
-                  <span className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/20">
-                    {formatCount(continueWatching.length, 'title')}
-                  </span>
-                </div>
+                <SectionHeading
+                  eyebrow="Pick up where you left off"
+                  title="Continue watching"
+                  count={formatCount(continueWatching.length, 'title')}
+                  className="mb-5"
+                />
                 <div className="grid grid-cols-2 gap-x-3.5 gap-y-8 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-5 xl:grid-cols-6">
                   {continueWatching.map((record, index) => {
                     const item = toTitle(record);
@@ -231,15 +229,12 @@ export default function HistoryView() {
             ) : null}
 
             <section>
-              <div className="mb-5 flex items-end justify-between gap-4">
-                <div>
-                  <p className="eyebrow">Everything you have played</p>
-                  <h2 className="section-heading mt-2">Recently watched</h2>
-                </div>
-                <span className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/20">
-                  {formatCount(records.length, 'title')}
-                </span>
-              </div>
+              <SectionHeading
+                eyebrow="Everything you have played"
+                title="Recently watched"
+                count={formatCount(records.length, 'title')}
+                className="mb-5"
+              />
 
               <div className="space-y-7">
                 {groups.map(([key, list]) => (

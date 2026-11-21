@@ -7,6 +7,7 @@ import type { BrowseResponse, TitleSummary } from '@/lib/media/types';
 import { apiGet } from '@/lib/api';
 import { getContinueWatching, getProgressRatio, subscribeToProgress } from '@/lib/watch-progress';
 import PageHeader from '@/components/ui/PageHeader';
+import SectionHeading from '@/components/ui/SectionHeading';
 import MediaCard from '@/components/media/MediaCard';
 import { MediaGridSkeleton } from '@/components/media/Skeletons';
 import EmptyState from '@/components/ui/EmptyState';
@@ -166,14 +167,16 @@ export default function RecentlyAddedView() {
           />
         ) : (
           <>
-            <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[0.7rem] font-medium text-white/35">
-                {formatCount(total, 'title')} sorted by the moment they were added
-              </p>
-              <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-white/20">
+            <SectionHeading
+              eyebrow="Fresh on the server"
+              title="Latest additions"
+              count={formatCount(total, 'title')}
+              className="mb-6"
+            >
+              <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-white/40">
                 Newest first
               </span>
-            </div>
+            </SectionHeading>
 
             <div className="grid grid-cols-2 gap-x-3.5 gap-y-8 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-9 xl:grid-cols-6">
               {items.map((item, index) => (

@@ -8,6 +8,7 @@ import { useApi } from '@/lib/use-api';
 import { getWatchlist, removeFromWatchlist, subscribeToWatchlist, type WatchlistEntry } from '@/lib/watchlist';
 import { getProgressRatio, subscribeToProgress, getProgress } from '@/lib/watch-progress';
 import PageHeader from '@/components/ui/PageHeader';
+import SectionHeading from '@/components/ui/SectionHeading';
 import MediaCard from '@/components/media/MediaCard';
 import { MediaGridSkeleton } from '@/components/media/Skeletons';
 import EmptyState from '@/components/ui/EmptyState';
@@ -119,17 +120,26 @@ export default function WatchlistView() {
           />
         ) : (
           <>
-            <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[0.7rem] font-medium text-white/35">
-                {formatCount(items.length, 'title')} in your list
-                {loading ? <span className="ml-2 text-white/20">refreshing…</span> : null}
-              </p>
-              {missing > 0 ? (
-                <p className="text-[0.62rem] font-medium text-amber-200/60">
-                  {missing} saved title{missing === 1 ? '' : 's'} missing from the current scan
-                </p>
-              ) : null}
-            </div>
+            <SectionHeading
+              eyebrow="Saved for later"
+              title="Your titles"
+              count={formatCount(items.length, 'title')}
+              className="mb-6"
+            >
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+                {loading ? (
+                  <span className="inline-flex items-center gap-1.5 text-[0.66rem] font-semibold text-white/30">
+                    <LoaderCircle className="h-3 w-3 animate-spin" />
+                    Refreshing
+                  </span>
+                ) : null}
+                {missing > 0 ? (
+                  <p className="rounded-full border border-amber-300/20 bg-amber-300/[0.07] px-2.5 py-1 text-[0.62rem] font-medium text-amber-200/70">
+                    {missing} saved title{missing === 1 ? '' : 's'} missing from the current scan
+                  </p>
+                ) : null}
+              </div>
+            </SectionHeading>
 
             <div className="grid grid-cols-2 gap-x-3.5 gap-y-8 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-5 lg:gap-y-9 xl:grid-cols-6">
               {items.map((item, index) => (

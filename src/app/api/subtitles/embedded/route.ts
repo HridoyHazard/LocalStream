@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "A valid media path is required" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const streamIndex = Number(params.get("track"));
-  if (!Number.isInteger(streamIndex) || streamIndex < 0) {
+  const trackParam = params.get("track");
+  const streamIndex = Number(trackParam);
+  if (trackParam === null || !Number.isInteger(streamIndex) || streamIndex < 0) {
     return NextResponse.json({ error: "A valid track index is required" }, { status: 400, headers: CORS_HEADERS });
   }
 

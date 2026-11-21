@@ -35,3 +35,7 @@ desktop.ini
 # Cache
 .cache/
 .turbo/
+*.tsbuildinfo
+
+# Extracted embedded subtitles (regenerated on demand)
+data/subtitles/

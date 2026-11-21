@@ -7,9 +7,11 @@ A Netflix-style personal cinema for an ISP-hosted h5ai media server. LocalStream
 - Scans MP4, MKV, AVI, MOV, WMV, WEBM, M4V and TS files from the h5ai tree into a persistent SQLite index.
 - Fuzzy, typo-tolerant search (`Avngers Endgame` → *Avengers-Endgame*) with did-you-mean suggestions, plus filters for year, genre, language, category, actor and director.
 - Movies, TV series and multi-part files, with automatic episode/season detection.
-- Hero carousel, browse grids, recently added, genres/collections, infinite scroll and skeletons.
+- Cinematic hero carousel, continue-watching and recommendation rails, browse grids, recently added, genres/collections, infinite scroll and skeletons.
 - Resume playback, seek, speed, picture-in-picture, subtitles, audio tracks, keyboard shortcuts, next-episode autoplay, watchlist and watch history.
+- Embedded (in-file) subtitle support: text tracks are extracted to WebVTT on demand and cached; bitmap tracks are detected and redirected to VLC.
 - Optional TMDB artwork/metadata when an API key is configured; local folder artwork otherwise.
+- Responsive layout with a mobile bottom nav, glass sheets, mega menu, progress-ring back-to-top and reduced-motion support.
 
 ## Requirements
 
@@ -51,6 +53,9 @@ npm run start
 | `VLC_COMPANION_HOST` | `127.0.0.1` | Companion bind address (keep loopback) |
 | `VLC_COMPANION_PORT` | `8642` | Companion port |
 | `VLC_PATH` | auto-detect | VLC executable for the companion |
+| `FFMPEG_PATH` | bundled | Override the ffmpeg binary used for subtitle extraction |
+| `FFPROBE_PATH` | bundled | Override the ffprobe binary used to inspect tracks |
+| `SUBTITLE_CACHE_DIR` | `data/subtitles` | Where extracted WebVTT tracks are cached |
 | `NEXT_PUBLIC_APP_NAME` | `LocalStream` | Display name |
 
 ## Scripts
@@ -78,10 +83,22 @@ Browsers cannot decode every codec. MKV containers, HEVC video and AC3 audio com
 
 The companion binds to loopback by default and only accepts private/local `/api/stream/` URLs, so it cannot be used as an open launcher by other machines.
 
+## Embedded subtitles
+
+`npm install` bundles `ffmpeg-static` and `@ffprobe-installer/ffprobe`, so no system ffmpeg is required. Set `FFMPEG_PATH` / `FFPROBE_PATH` if you prefer a system build.
+
+1. The player asks `/api/subtitles/tracks?path=…` for the subtitle streams inside the current file.
+2. Selecting a text track calls `/api/subtitles/embedded?path=…&track=…&size=…`. The first request starts an ffmpeg extraction and answers `202` while the player polls with the job's progress.
+3. When extraction finishes, the API returns WebVTT (`200 text/vtt`), the player activates it as a Blob text track and the result stays cached in `SUBTITLE_CACHE_DIR`.
+4. The cache stores a sidecar with the source file size, so a replaced file at the same path is re-extracted instead of serving stale subtitles. Jobs run two at a time with a 30-minute timeout; failed or stale jobs are dropped after 15 minutes.
+
+Supported text codecs include SRT/SubRip, ASS/SSA, `mov_text` (MP4), WebVTT, TTML, SAMI, MicroDVD and similar. Bitmap formats — PGS (Blu-ray), VobSub/DVD, DVB, XSUB and Teletext — cannot be rendered by browsers; the menu marks them **VLC** and explains that the file should be opened in VLC for those tracks. One embedded track can be active at a time, alongside any local subtitle files you load in the player.
+
 ## Notes and limitations
 
 - No transcoding: files play in their native format. Install VLC for unsupported codecs.
 - Skip-intro is not implemented because the library exposes no chapter/intro metadata; it is better absent than faked.
-- Subtitles attached to the library are converted from SRT/ASS to WebVTT by `/api/subtitles`. This library currently has no subtitle sidecar files.
+- Embedded text subtitles are extracted on demand (the first play of a track can take a while on large files); later plays use the cache. Bitmap subtitles are VLC-only.
+- The library has no subtitle sidecar files today, so the player's **Load subtitle file** option is there for files you supply yourself.
 - Playback progress and the watchlist live in the browser (`localStorage`); nothing is uploaded.
 - TMDB enrichment is optional and degrades gracefully to local artwork and folder-derived metadata.

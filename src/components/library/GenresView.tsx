@@ -14,6 +14,7 @@ import {
 import type { StatsResponse } from '@/lib/media/types';
 import { useApi } from '@/lib/use-api';
 import PageHeader from '@/components/ui/PageHeader';
+import SectionHeading from '@/components/ui/SectionHeading';
 import { cn, formatCount } from '@/lib/utils';
 
 type Kind = 'movie' | 'series';
@@ -80,15 +81,11 @@ export default function GenresView() {
         </div>
 
         <section>
-          <div className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="eyebrow">Browse by mood</p>
-              <h2 className="section-heading mt-2">Genres</h2>
-            </div>
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/20">
-              {facets?.genres.length ?? 0} available
-            </span>
-          </div>
+          <SectionHeading
+            title="Genres"
+            count={`${facets?.genres.length ?? 0} available`}
+            className="mb-4"
+          />
 
           {loading ? (
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,16 +131,8 @@ export default function GenresView() {
           )}
         </section>
 
-        <section className="mt-12">
-          <div className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="eyebrow">A trip through time</p>
-              <h2 className="section-heading mt-2">By decade</h2>
-            </div>
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/20">
-              {decades.length} decades
-            </span>
-          </div>
+        <section className="mt-10">
+          <SectionHeading title="By decade" count={`${decades.length} decades`} className="mb-4" />
 
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {decades.map(([decade]) => (
@@ -165,16 +154,12 @@ export default function GenresView() {
           </div>
         </section>
 
-        <section className="mt-12">
-          <div className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="eyebrow">Straight from the server</p>
-              <h2 className="section-heading mt-2">Collections</h2>
-            </div>
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/20">
-              {formatCount(data?.collections.length ?? 0, 'folder')}
-            </span>
-          </div>
+        <section className="mt-10">
+          <SectionHeading
+            title="Collections"
+            count={formatCount(data?.collections.length ?? 0, 'folder')}
+            className="mb-4"
+          />
 
           {loading ? (
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">

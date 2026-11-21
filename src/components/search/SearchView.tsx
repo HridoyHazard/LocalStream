@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowRight,
   CalendarDays,
   ChevronDown,
   Clapperboard,
@@ -55,8 +56,8 @@ function saveRecent(query: string) {
 
 function SpotlightResult({ item }: { item: TitleSummary }) {
   return (
-    <div className="group relative mb-8 overflow-hidden rounded-[1.4rem] border border-white/[0.08] bg-white/[0.025]">
-      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-accent/[0.08] blur-[80px]" />
+    <div className="group relative mb-8 overflow-hidden rounded-2xl border border-white/10 bg-[#151516]">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#e50914]/[0.09] blur-[80px]" />
       <div className="relative flex flex-col gap-5 p-4 sm:flex-row sm:items-center sm:p-5">
         <Link
           href={detailsHref(item)}
@@ -71,9 +72,11 @@ function SpotlightResult({ item }: { item: TitleSummary }) {
           />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="eyebrow">Top match</p>
+          <span className="inline-flex items-center gap-1.5 rounded bg-[#e50914] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+            Top match
+          </span>
           <Link href={detailsHref(item)} className="mt-2 block">
-            <h2 className="display-title text-[2.4rem] leading-none text-white transition-colors group-hover:text-accent-100 sm:text-[3rem]">
+            <h2 className="text-[1.6rem] font-bold leading-tight tracking-[-0.02em] text-white transition-colors group-hover:text-[#ff6b73] sm:text-[2rem]">
               {item.title}
             </h2>
           </Link>
@@ -204,14 +207,14 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
             runSearch(query);
           }}
         >
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-accent-400" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#e50914]" />
           <input
             ref={inputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Try “Avngers Endgame”, “Interstllar” or “Jhon Wick”…"
-            className="h-14 w-full rounded-full border border-white/[0.12] bg-white/[0.055] pl-11 pr-32 text-[0.95rem] font-medium text-white shadow-[0_20px_50px_-25px_rgba(0,0,0,0.85)] outline-none backdrop-blur-md transition-colors placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.075]"
+            className="h-12 w-full rounded-full border border-white/15 bg-white/[0.06] pl-11 pr-32 text-[0.92rem] font-medium text-white outline-none transition-colors placeholder:text-neutral-500 focus:border-[#e50914]/70 focus:bg-[#1a1a1e] focus:ring-2 focus:ring-[#e50914]/20"
             aria-label="Search the library"
             autoComplete="off"
             spellCheck={false}
@@ -383,13 +386,14 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
         {!debouncedQuery ? (
           <div className="space-y-10">
             <section>
-              <div className="mb-5 flex items-end justify-between">
-                <div>
-                  <p className="eyebrow">Not sure what to watch?</p>
-                  <h2 className="display-title mt-2 text-[2.2rem] leading-none text-white">Popular right now</h2>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-1 rounded-sm bg-[#e50914]" />
+                  <h2 className="text-base font-bold tracking-tight text-white sm:text-lg">Popular right now</h2>
                 </div>
-                <Link href="/recently-added" className="text-[0.7rem] font-semibold text-white/40 transition-colors hover:text-white">
+                <Link href="/recently-added" className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-neutral-400 transition hover:bg-white/5 hover:text-white">
                   Recently added
+                  <ArrowRight className="h-3.5 w-3.5 text-[#e50914]" />
                 </Link>
               </div>
               {popularData ? (
@@ -480,9 +484,12 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
 
             {rest.length > 0 ? (
               <>
-                <div className="mb-4 flex items-baseline justify-between">
-                  <h2 className="section-heading">More matches</h2>
-                  <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-white/20">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-4 w-1 rounded-sm bg-[#e50914]" />
+                    <h2 className="text-base font-bold tracking-tight text-white sm:text-lg">More matches</h2>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                     Ranked by relevance
                   </span>
                 </div>
