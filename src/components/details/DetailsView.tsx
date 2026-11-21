@@ -944,11 +944,24 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
           />
         ) : null}
 
-        {title.episodes.some((episode) => episode.subtitles.length > 0) ? (
+        {title.subtitles.length > 0 || title.episodes.some((episode) => episode.subtitles.length > 0) ? (
           <section className="panel p-5 sm:p-6">
             <p className="eyebrow">Subtitles</p>
             <h2 className="mt-2 text-lg font-bold tracking-tight text-white">Available subtitle tracks</h2>
             <div className="mt-3 flex flex-wrap gap-1.5">
+              {title.subtitles.map((track) => (
+                <a
+                  key={`title-${track.path}`}
+                  href={subtitleUrl(track.path)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chip !h-7 text-[0.62rem]"
+                  title={track.path}
+                >
+                  <Captions className="h-2.5 w-2.5" />
+                  {track.label}
+                </a>
+              ))}
               {title.episodes.flatMap((episode) =>
                 episode.subtitles.map((track) => (
                   <a

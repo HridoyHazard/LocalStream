@@ -624,6 +624,10 @@ async function startQueuedJob(job: ExtractionJob) {
     activeExtractions = Math.max(0, activeExtractions - 1);
     job.state = "error";
     job.error = "Embedded subtitles need ffmpeg. Install it or set FFMPEG_PATH.";
+    const cleanup = setTimeout(() => {
+      if (jobs.get(job.key) === job) jobs.delete(job.key);
+    }, JOB_RETENTION_MS);
+    cleanup.unref?.();
     pumpQueue();
     return;
   }

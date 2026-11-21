@@ -555,7 +555,7 @@ a {
   }
 
   .page-enter {
-    animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .mask-fade-x {

@@ -88,6 +88,7 @@ function corsHeaders(origin) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '600',
+    'Access-Control-Allow-Private-Network': 'true',
     'Cache-Control': 'no-store',
   };
   if (origin && originAllowed(origin)) headers['Access-Control-Allow-Origin'] = origin;

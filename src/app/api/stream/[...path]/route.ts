@@ -132,7 +132,17 @@ export async function HEAD(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Invalid media path" }, { status: 400 });
   }
 
-  const relativePath = path.map((segment) => decodeURIComponent(segment)).join("/");
+  const decoded = path.map((segment) => {
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  });
+  if (!isValidPath(decoded)) {
+    return NextResponse.json({ error: "Invalid media path" }, { status: 400 });
+  }
+  const relativePath = decoded.join("/");
   const upstreamUrl = mediaUrlForPath(relativePath);
 
   let upstream: Response;

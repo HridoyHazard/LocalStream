@@ -71,6 +71,8 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS titles_added_idx ON titles(added_at DESC);
     CREATE INDEX IF NOT EXISTS titles_rating_idx ON titles(rating DESC);
     CREATE INDEX IF NOT EXISTS titles_normalized_idx ON titles(normalized_title);
+    CREATE INDEX IF NOT EXISTS titles_local_poster_idx ON titles(local_poster);
+    CREATE INDEX IF NOT EXISTS titles_local_backdrop_idx ON titles(local_backdrop);
 
     CREATE TABLE IF NOT EXISTS episodes (
       id TEXT PRIMARY KEY,

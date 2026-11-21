@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "scan": "tsx scripts/scan.ts",
-    "scan:full": "tsx scripts/scan.ts --force",
-    "verify": "tsx scripts/verify.ts",
-    "vlc": "node scripts/vlc-companion.mjs"
+    "scan": "tsx --env-file=.env.local scripts/scan.ts",
+    "scan:full": "tsx --env-file=.env.local scripts/scan.ts --force",
+    "verify": "tsx --env-file=.env.local scripts/verify.ts",
+    "vlc": "node --env-file=.env.local scripts/vlc-companion.mjs"
   },
   "dependencies": {
     "@ffprobe-installer/ffprobe": "^2.1.2",

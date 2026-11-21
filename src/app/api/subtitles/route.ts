@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mediaUrlForPath } from "@/lib/server/config";
-import { extensionOf } from "@/lib/media/normalize";
+import { extensionOf, isSubtitleFile } from "@/lib/media/normalize";
+import { normalizeMediaPath } from "@/lib/server/paths";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -72,8 +73,8 @@ function assToVtt(input: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const relativePath = request.nextUrl.searchParams.get("path");
-  if (!relativePath || relativePath.split("/").some((segment) => segment === ".." || segment === ".")) {
+  const relativePath = normalizeMediaPath(request.nextUrl.searchParams.get("path"));
+  if (!relativePath || !isSubtitleFile(relativePath)) {
     return NextResponse.json({ error: "A valid subtitle path is required" }, { status: 400 });
   }
 

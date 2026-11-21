@@ -109,6 +109,7 @@ function personMatches(query: string, names: string[]) {
 }
 
 function matchScore(doc: SearchDoc, rawQuery: string, query: string) {
+  query = normalizeTitle(query) || query;
   let best = titleSimilarity(query, doc.title);
   for (const alt of doc.altTitles) {
     const score = titleSimilarity(query, alt);

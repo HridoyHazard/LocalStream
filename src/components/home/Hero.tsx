@@ -135,7 +135,7 @@ function SlideContent({
           {item.rating ? (
             <span className="flex items-center gap-1 rounded border border-amber-500/20 bg-amber-950/40 px-2 py-0.5 text-xs font-bold text-amber-400">
               <Star className="h-3 w-3 fill-amber-400" />
-              {item.rating.toFixed(1)} <span className="text-[9px] font-semibold text-amber-400/70">IMDb</span>
+              {item.rating.toFixed(1)} <span className="text-[9px] font-semibold text-amber-400/70">TMDB</span>
             </span>
           ) : null}
           {item.kind === 'series' ? (

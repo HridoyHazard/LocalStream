@@ -38,7 +38,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["var(--font-ui)", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["var(--font-ui)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
         card: "0 18px 40px -22px rgba(0, 0, 0, 0.85)",

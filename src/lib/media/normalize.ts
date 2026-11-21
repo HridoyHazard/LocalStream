@@ -117,10 +117,9 @@ const RELEASE_TAGS = new RegExp(
     "\\b(?:blu-?ray|bdrip|brrip|bdremux|remux|web-?dl|webrip|web\\b|hdrip|dvdrip|dvdscr|dvd|camrip|cam|hdcam|hdts|telesync|telecine|predvd|hdtv|pdtv|sdtv|tvrip)\\b",
     "\\b(?:x264|x265|h\\.?264|h\\.?265|hevc|avc|xvid|divx|av1|10-?bit|8-?bit)\\b",
     "\\b(?:aac|aac2\\.0|ac3|eac3|ddp?\\s*[257]\\.[01]|dts(?:-hd)?|truehd|atmos|flac|opus|mp3)\\b",
-    "\\b(?:ddp[257]|5\\.1|7\\.1|2\\.0|dual\\s*audio|multi\\s*audio|dubbed|subbed)\\b",
+    "\\b(?:ddp[257]|5\\.1|7\\.1|dual\\s*audio|multi\\s*audio|dubbed|subbed)\\b",
     "\\b(?:amzn|nf|netflix|dsnp|hmax|atvp|pcok|hulu|itunes|apple\\s*tv|stan|zee5|hotstar|sonyliv)\\b",
     "\\b(?:proper|repack|rerip)\\b",
-    "\\b(?:sample|trailer|teaser|featurette|extras?|bonus)\\b",
   ].join("|"),
   "gi",
 );
@@ -214,7 +213,7 @@ function cleanReleaseText(value: string) {
   // happen to contain words like "English" or "Hindi".
   const marker = new RegExp(RELEASE_TAGS.source, "i");
   const hit = marker.exec(text);
-  if (hit?.index !== undefined) text = text.slice(0, hit.index);
+  if (hit?.index !== undefined && hit.index > 0) text = text.slice(0, hit.index);
 
   text = text.replace(/[._]+/g, " ");
   text = text.replace(/\s+-\s*[A-Za-z0-9]{2,16}\s*$/, " "); // trailing release group

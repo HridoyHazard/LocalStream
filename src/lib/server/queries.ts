@@ -16,6 +16,7 @@ import type {
   TitleSummary,
 } from "@/lib/media/types";
 import { getScanStatus } from "./scanner";
+import { normalizeTitle } from "@/lib/media/normalize";
 
 const LIST_SELECT = `
   SELECT ${TITLE_COLUMNS},
@@ -239,7 +240,8 @@ export function getBrowse(params: BrowseParams = {}): BrowseResponse {
   }
   if (params.query?.trim()) {
     where.push("t.normalized_title LIKE ?");
-    values.push(`%${normalizeSqlLike(params.query.trim())}%`);
+    const needle = normalizeTitle(params.query) || normalizeSqlLike(params.query.trim());
+    values.push(`%${needle}%`);
   }
   if (params.genre) {
     where.push("t.genres LIKE ?");
@@ -345,7 +347,7 @@ export function getHomeData(): HomeData {
   }
 
   const heroCandidates = queryTitles(
-    "t.kind = 'movie' AND t.year >= 2000 AND t.category != '3D Movies'",
+    "t.kind = 'movie' AND t.year >= 2000 AND COALESCE(t.category, '') != '3D Movies'",
     "COALESCE(t.rating, 0) DESC, t.total_size DESC, t.added_at DESC",
     18,
   );
@@ -448,7 +450,7 @@ export function getRelatedTitles(title: TitleDetail, limit = 16): TitleSummary[]
 
 export function getHeroPool(limit = 6): TitleSummary[] {
   return queryTitles(
-    "t.kind = 'movie' AND t.year >= 2000 AND t.category != '3D Movies'",
+    "t.kind = 'movie' AND t.year >= 2000 AND COALESCE(t.category, '') != '3D Movies'",
     "COALESCE(t.rating,0) DESC, t.total_size DESC",
     limit,
   );

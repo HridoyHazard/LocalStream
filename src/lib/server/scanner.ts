@@ -143,6 +143,11 @@ function prefixPattern(value: string) {
   return `${escapeLike(value)}/%`;
 }
 
+/** Index-friendly bounds for "path starts with `dir/`" ('0' sorts right after '/'). */
+function prefixRange(dir: string): [string, string] {
+  return [`${dir}/`, `${dir}0`];
+}
+
 function parseMtime(value: string) {
   if (!value) return Date.now();
   const normalized = value.replace(" ", "T");
@@ -572,7 +577,7 @@ export class Scanner {
         cached.kind === "movie"
           ? Boolean(this.db.prepare("SELECT 1 FROM titles WHERE kind = 'movie' AND folder_path = ?").get(job.path))
           : cached.kind === "season" || cached.kind === "series"
-            ? Boolean(this.db.prepare("SELECT 1 FROM media_files WHERE substr(path, 1, ?) = ? LIMIT 1").get(job.path.length + 1, `${job.path}/`))
+            ? Boolean(this.db.prepare("SELECT 1 FROM media_files WHERE path >= ? AND path < ? LIMIT 1").get(...prefixRange(job.path)))
             : true;
       if (hasContent) {
         return;
@@ -585,9 +590,9 @@ export class Scanner {
       const hasDirs = listing.items.some((item) => item.isDir);
       if (!hasVideos && !hasDirs) {
         this.db.transaction(() => {
-          const prefix = `${job.path}/`;
-          this.db.prepare("DELETE FROM media_files WHERE substr(path, 1, ?) = ?").run(prefix.length, prefix);
-          this.db.prepare("DELETE FROM episodes WHERE substr(path, 1, ?) = ?").run(prefix.length, prefix);
+          const [from, to] = prefixRange(job.path);
+          this.db.prepare("DELETE FROM media_files WHERE path >= ? AND path < ?").run(from, to);
+          this.db.prepare("DELETE FROM episodes WHERE path >= ? AND path < ?").run(from, to);
           if (cached.kind === "movie") {
             this.db.prepare("DELETE FROM titles WHERE kind = 'movie' AND folder_path = ?").run(job.path);
           }
@@ -851,14 +856,17 @@ export class Scanner {
     }
 
     // Drop titles that belonged to removed files in this folder.
-    const prefix = `${path}/`;
+    const [from, to] = prefixRange(path);
     const keep = new Set(titleIds);
     const existing = this.db
-      .prepare("SELECT id, folder_path FROM titles WHERE kind = 'movie' AND substr(folder_path, 1, ?) = ?")
-      .all(prefix.length, prefix) as { id: string; folder_path: string }[];
+      .prepare("SELECT id, folder_path FROM titles WHERE kind = 'movie' AND folder_path >= ? AND folder_path < ?")
+      .all(from, to) as { id: string; folder_path: string }[];
     const removeTitle = this.db.prepare("DELETE FROM titles WHERE id = ?");
     for (const row of existing) {
-      if (!keep.has(row.id) && row.folder_path !== path) removeTitle.run(row.id);
+      // Only per-file titles of this folder. Sub-folder movies belong to their own scan.
+      if (!keep.has(row.id) && row.folder_path !== path && isVideoFile(row.folder_path) && dirname(row.folder_path) === path) {
+        removeTitle.run(row.id);
+      }
     }
     this.removeStaleMediaFiles(path, videos.map((video) => video.path));
   }
@@ -917,7 +925,7 @@ export class Scanner {
           file_path = CASE WHEN excluded.file_path != '' THEN excluded.file_path ELSE titles.file_path END,
           extension = CASE WHEN excluded.extension != '' THEN excluded.extension ELSE titles.extension END,
           file_size = CASE WHEN excluded.file_size > 0 THEN excluded.file_size ELSE titles.file_size END,
-          total_size = MAX(titles.total_size, excluded.total_size),
+          total_size = CASE WHEN excluded.kind = 'movie' THEN excluded.total_size ELSE titles.total_size END,
           subtitles = CASE WHEN excluded.kind = 'movie' THEN excluded.subtitles ELSE titles.subtitles END,
           added_at = MAX(titles.added_at, excluded.added_at),
           updated_at = excluded.updated_at`,
@@ -1014,14 +1022,14 @@ export class Scanner {
 
   private removeStaleMediaFiles(dirPath: string, currentPaths: string[]) {
     if (!dirPath) return;
-    const prefix = `${dirPath}/`;
+    const [from, to] = prefixRange(dirPath);
     const existing = this.db
-      .prepare("SELECT path FROM media_files WHERE substr(path, 1, ?) = ?")
-      .all(prefix.length, prefix) as { path: string }[];
+      .prepare("SELECT path FROM media_files WHERE path >= ? AND path < ?")
+      .all(from, to) as { path: string }[];
     const keep = new Set(currentPaths);
     const remove = this.db.prepare("DELETE FROM media_files WHERE path = ?");
     for (const row of existing) {
-      if (!keep.has(row.path)) remove.run(row.path);
+      if (dirname(row.path) === dirPath && !keep.has(row.path)) remove.run(row.path);
     }
   }
 
