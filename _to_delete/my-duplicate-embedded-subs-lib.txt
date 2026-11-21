@@ -1,0 +1,308 @@
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rename, rm } from "node:fs/promises";
+import path from "node:path";
+
+/**
+ * Browsers cannot read subtitle streams that are embedded inside MKV/MP4
+ * files. This module finds those streams with ffprobe and converts one at a
+ * time to WebVTT with ffmpeg. Results are cached on disk, because extracting a
+ * track means reading the whole file once.
+ */
+
+export interface EmbeddedTrack {
+  /** Absolute stream index inside the container (used with ffmpeg -map 0:N). */
+  index: number;
+  codec: string;
+  language: string;
+  label: string;
+  /** False for image based formats (PGS, VobSub) that cannot become text. */
+  supported: boolean;
+  forced: boolean;
+  isDefault: boolean;
+}
+
+export interface EmbeddedSubsConfig {
+  ffmpegPath: string;
+  ffprobePath: string;
+  cacheDir: string;
+}
+
+export type SubtitleResult =
+  | { status: "ready"; vtt: string }
+  | { status: "working"; elapsedMs: number }
+  | { status: "error"; message: string };
+
+export class FfmpegMissingError extends Error {
+  binary: string;
+  constructor(binary: string) {
+    super(`Could not start "${binary}". Install ffmpeg on the computer that runs LocalStream.`);
+    this.name = "FfmpegMissingError";
+    this.binary = binary;
+  }
+}
+
+const USER_AGENT = "LocalStream/1.0 (+embedded subtitle reader)";
+
+const TEXT_CODECS = new Set([
+  "subrip",
+  "srt",
+  "ass",
+  "ssa",
+  "mov_text",
+  "webvtt",
+  "text",
+  "subviewer",
+  "subviewer1",
+  "microdvd",
+  "jacosub",
+  "sami",
+  "realtext",
+  "stl",
+  "vplayer",
+  "pjs",
+  "mpl2",
+]);
+
+interface RunResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+function run(command: string, args: string[], timeoutMs: number): Promise<RunResult> {
+  return new Promise((resolve, reject) => {
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`${path.basename(command)} timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      if (size < 4_000_000) {
+        chunks.push(chunk);
+        size += chunk.length;
+      }
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString("utf8")).slice(-4000);
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") reject(new FfmpegMissingError(command));
+      else reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code, stdout: Buffer.concat(chunks).toString("utf8"), stderr });
+    });
+  });
+}
+
+function lastLine(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines[lines.length - 1] ?? "";
+}
+
+function languageName(code: string) {
+  if (!code || code === "und") return "Unknown language";
+  try {
+    const name = new Intl.DisplayNames(["en"], { type: "language" }).of(code);
+    if (name && name.toLowerCase() !== code.toLowerCase()) return name;
+  } catch {
+    // Fall through to the raw code.
+  }
+  return code.toUpperCase();
+}
+
+interface ProbeStream {
+  index?: number;
+  codec_name?: string;
+  tags?: Record<string, string>;
+  disposition?: { default?: number; forced?: number };
+}
+
+const trackCache = new Map<string, { at: number; tracks: EmbeddedTrack[] }>();
+const TRACK_CACHE_MS = 10 * 60_000;
+
+/** Lists subtitle streams embedded in a remote video file. Reads only the header. */
+export async function listEmbeddedTracks(config: EmbeddedSubsConfig, url: string): Promise<EmbeddedTrack[]> {
+  const hit = trackCache.get(url);
+  if (hit && Date.now() - hit.at < TRACK_CACHE_MS) return hit.tracks;
+
+  const { code, stdout, stderr } = await run(
+    config.ffprobePath,
+    [
+      "-v",
+      "error",
+      "-user_agent",
+      USER_AGENT,
+      "-print_format",
+      "json",
+      "-show_streams",
+      "-select_streams",
+      "s",
+      url,
+    ],
+    90_000,
+  );
+  if (code !== 0) throw new Error(lastLine(stderr) || `ffprobe exited with code ${code}`);
+
+  let parsed: { streams?: ProbeStream[] };
+  try {
+    parsed = JSON.parse(stdout) as { streams?: ProbeStream[] };
+  } catch {
+    throw new Error("ffprobe returned unreadable output");
+  }
+
+  const tracks: EmbeddedTrack[] = [];
+  for (const stream of parsed.streams ?? []) {
+    if (typeof stream.index !== "number") continue;
+    const tags = Object.fromEntries(Object.entries(stream.tags ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
+    const codec = (stream.codec_name ?? "unknown").toLowerCase();
+    const language = (tags.language ?? "und").toLowerCase();
+    const title = (tags.title ?? "").trim();
+    const forced = stream.disposition?.forced === 1;
+    const name = languageName(language);
+    const extras = [title && title.toLowerCase() !== name.toLowerCase() ? title : "", forced ? "forced" : ""].filter(Boolean);
+    tracks.push({
+      index: stream.index,
+      codec,
+      language,
+      label: extras.length ? `${name} · ${extras.join(" · ")}` : name,
+      supported: TEXT_CODECS.has(codec),
+      forced,
+      isDefault: stream.disposition?.default === 1,
+    });
+  }
+
+  trackCache.set(url, { at: Date.now(), tracks });
+  return tracks;
+}
+
+async function remoteSignature(url: string) {
+  try {
+    const response = await fetch(url, {
+      method: "HEAD",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    return [response.headers.get("content-length"), response.headers.get("last-modified"), response.headers.get("etag")]
+      .map((value) => value ?? "")
+      .join("|");
+  } catch {
+    return "";
+  }
+}
+
+async function readCached(file: string) {
+  try {
+    return await readFile(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function extract(config: EmbeddedSubsConfig, url: string, streamIndex: number, file: string) {
+  await mkdir(config.cacheDir, { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  const { code, stderr } = await run(
+    config.ffmpegPath,
+    [
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-user_agent",
+      USER_AGENT,
+      "-i",
+      url,
+      "-map",
+      `0:${streamIndex}`,
+      "-vn",
+      "-an",
+      "-dn",
+      "-c:s",
+      "webvtt",
+      "-f",
+      "webvtt",
+      "-y",
+      tmp,
+    ],
+    20 * 60_000,
+  );
+  if (code !== 0) {
+    await rm(tmp, { force: true });
+    throw new Error(lastLine(stderr) || `ffmpeg exited with code ${code}`);
+  }
+  await rename(tmp, file);
+}
+
+interface Job {
+  startedAt: number;
+  error?: string;
+  missing?: boolean;
+}
+
+const jobs = new Map<string, Job>();
+// Extractions read whole files from the media server, so run them one by one.
+let queue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Returns a cached WebVTT track, or starts a background extraction and reports
+ * "working" so the caller can poll. Failed jobs report their error once.
+ */
+export async function getEmbeddedSubtitle(
+  config: EmbeddedSubsConfig,
+  relativePath: string,
+  url: string,
+  streamIndex: number,
+): Promise<SubtitleResult> {
+  const signature = await remoteSignature(url);
+  const key = createHash("sha1").update(`${relativePath}|${signature}|${streamIndex}`).digest("hex");
+  const file = path.join(config.cacheDir, `${key}.vtt`);
+
+  const cached = await readCached(file);
+  if (cached !== null) return { status: "ready", vtt: cached };
+
+  const existing = jobs.get(key);
+  if (existing) {
+    if (existing.error) {
+      jobs.delete(key);
+      if (existing.missing) throw new FfmpegMissingError(config.ffmpegPath);
+      return { status: "error", message: existing.error };
+    }
+    return { status: "working", elapsedMs: Date.now() - existing.startedAt };
+  }
+
+  const job: Job = { startedAt: Date.now() };
+  jobs.set(key, job);
+  queue = queue
+    .then(() => extract(config, url, streamIndex, file))
+    .then(
+      () => {
+        jobs.delete(key);
+      },
+      (error: unknown) => {
+        job.error = error instanceof Error ? error.message : String(error);
+        job.missing = error instanceof FfmpegMissingError;
+        // Keep the failure long enough for the next poll to report it.
+        setTimeout(() => jobs.delete(key), 120_000).unref?.();
+      },
+    );
+  return { status: "working", elapsedMs: 0 };
+}

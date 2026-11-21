@@ -1,0 +1,306 @@
+{
+  "screenshots": [
+    "v4-home-desktop",
+    "v4-home-desktop-rows",
+    "v4-card-hover",
+    "v4-overlay",
+    "v4-overlay-results",
+    "v4-movies",
+    "v4-movies-filtered",
+    "v4-series",
+    "v4-search-loading",
+    "v4-search",
+    "v4-details",
+    "v4-details-copied",
+    "v4-watch",
+    "v4-not-found",
+    "v4-home-tablet",
+    "v4-movies-tablet",
+    "v4-home-mobile",
+    "v4-home-mobile-rows",
+    "v4-menu-mobile",
+    "v4-overlay-mobile",
+    "v4-movies-mobile",
+    "v4-search-mobile",
+    "v4-details-mobile"
+  ],
+  "checks": {
+    "home.desktop.overflow": {
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "bodyWidth": 1440,
+      "horizontalOverflow": false
+    },
+    "home.desktop.hero": {
+      "title": "Big Buck Bunny",
+      "titleSize": "120px",
+      "poster": {
+        "x": 1088.8125,
+        "y": 239.11819458007812,
+        "width": 295.1875,
+        "height": 442.7812194824219,
+        "top": 239.11819458007812,
+        "right": 1384,
+        "bottom": 681.8994140625,
+        "left": 1088.8125
+      },
+      "rows": 16,
+      "sections": [
+        "Tonight on LocalStream",
+        "Movies",
+        "TV Series",
+        "The theater is already in your home."
+      ]
+    },
+    "home.desktop.hover": {
+      "cardHover": true,
+      "posterTransform": "matrix(1, 0, 0, 1, 0, -6)",
+      "playOpacity": "1"
+    },
+    "overlay.open": {
+      "open": true,
+      "focused": "Search query",
+      "bodyOverflow": "hidden",
+      "chips": [
+        "Everything16",
+        "Movies10",
+        "Series6"
+      ]
+    },
+    "overlay.keyboard": {
+      "results": 7,
+      "firstActive": "BBig Buck Bunny2008 · Filmmp4",
+      "activeAfter": "T",
+      "navigatedTo": "http://localhost:3000/details/demo-tears-of-steel?path=movies%2FTearsOfSteel.mp4&title=Tears+of+Steel"
+    },
+    "overlay.bodyRestored": "",
+    "movies.desktop.overflow": {
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "bodyWidth": 1440,
+      "horizontalOverflow": false
+    },
+    "movies.desktop.filters": {
+      "baseCount": 10,
+      "decades": [
+        "All",
+        "2020s",
+        "2010s",
+        "2000s"
+      ],
+      "decadeResult": {
+        "count": 6,
+        "active": "2010s",
+        "found": "6 titles found"
+      },
+      "sortedFirst": "ALS / 670mp4Feature presentationAgent 327: Operation Barbershop2017 · Local libraryFilm"
+    },
+    "series.desktop": {
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "bodyWidth": 1440,
+        "horizontalOverflow": false
+      },
+      "count": 6,
+      "heading": "TV Series"
+    },
+    "search.loadingChips": [
+      "Everything—",
+      "Movies—",
+      "Series—"
+    ],
+    "search.loadedChips": [
+      "Everything16",
+      "Movies10",
+      "Series6"
+    ],
+    "search.desktop": {
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "bodyWidth": 1440,
+        "horizontalOverflow": false
+      },
+      "resultHeading": "2 titles for “the”",
+      "resultCount": 2
+    },
+    "details.desktop.overflow": {
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "bodyWidth": 1440,
+      "horizontalOverflow": false
+    },
+    "details.copy": {
+      "playHref": "/watch/demo-sintel?path=movies%2FSintel.mp4&title=Sintel",
+      "copyState": {
+        "text": "Path copied",
+        "title": "Copy the source path",
+        "cls": "btn btn-ghost btn-sm mt-3 w-full border-emerald-400/25 text-emerald-300"
+      }
+    },
+    "watch.desktop": {
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "bodyWidth": 1440,
+        "horizontalOverflow": false
+      },
+      "hasTitle": true,
+      "bodyText": "Skip to content\nBack\nLOCALSTREAM\n\nSintel\n\nNOW PLAYING · FEATURE FILM\n\nLOCAL STREAM\n\nPREPARING YOUR STREAM\n\nStreaming directly from your local network\n\nNOW PLAYING\nFILM\nMP4\nSintel\n\nFilm\nDirect from your local server\n\nInst"
+    },
+    "notfound": {
+      "status": "LocalStream — Your personal cinema",
+      "bodyText": "Skip to content\nLOCALSTREAM\nPERSONAL CINEMA\nHome\nMovies\nTV Series\nDemo library\nSearch library\nCtrl K\n\n404\n\nSCENE NOT FOUND\n\nThis page isn't in your library.\n\nThe link may be old or",
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "bodyWidth": 1440,
+        "horizontalOverflow": false
+      }
+    },
+    "home.tablet": {
+      "overflow": {
+        "scrollWidth": 768,
+        "innerWidth": 768,
+        "bodyWidth": 768,
+        "horizontalOverflow": false
+      },
+      "hero": {
+        "gridCols": "458.562px 208px",
+        "posterWidth": 208,
+        "posterHeight": 312
+      }
+    },
+    "movies.tablet": {
+      "overflow": {
+        "scrollWidth": 768,
+        "innerWidth": 768,
+        "bodyWidth": 768,
+        "horizontalOverflow": false
+      },
+      "count": 10,
+      "cols": "none"
+    },
+    "home.mobile": {
+      "overflow": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyWidth": 390,
+        "horizontalOverflow": false
+      },
+      "hero": {
+        "title": "Big Buck Bunny",
+        "titleSize": "59.2px",
+        "posterVisible": false
+      }
+    },
+    "mobile.menuHandoff": {
+      "menuLock": "hidden",
+      "overlayState": {
+        "menu": false,
+        "overlay": true,
+        "bodyOverflow": "hidden",
+        "focused": "Search query"
+      },
+      "afterEscapeOverflow": ""
+    },
+    "movies.mobile": {
+      "overflow": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyWidth": 390,
+        "horizontalOverflow": false
+      },
+      "count": 10,
+      "cols": "none"
+    },
+    "search.mobile": {
+      "overflow": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyWidth": 390,
+        "horizontalOverflow": false
+      },
+      "count": 16
+    },
+    "details.mobile": {
+      "overflow": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyWidth": 390,
+        "horizontalOverflow": false
+      },
+      "posterWidth": 272,
+      "h1Size": "48px"
+    }
+  },
+  "logs": {
+    "home-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "movies-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "series-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "search-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "details-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "watch-desktop": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "not-found": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "home-tablet": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "movies-tablet": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "home-mobile": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "movies-mobile": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "search-mobile": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    },
+    "details-mobile": {
+      "console": [],
+      "pageerrors": [],
+      "failed": []
+    }
+  },
+  "errors": []
+}

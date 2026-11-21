@@ -1,0 +1,67 @@
+{
+  "home-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "movies-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "series-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "search-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "details-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "watch-desktop": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "not-found": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "home-tablet": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "movies-tablet": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "home-mobile": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "movies-mobile": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "search-mobile": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  },
+  "details-mobile": {
+    "console": [],
+    "pageerrors": [],
+    "failed": []
+  }
+}
