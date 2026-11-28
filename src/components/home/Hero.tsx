@@ -16,6 +16,7 @@ interface HeroProps {
   items: TitleSummary[];
   loading?: boolean;
   online?: boolean;
+  checking?: boolean;
 }
 
 const ROTATION_MS = 7000;
@@ -87,10 +88,12 @@ function SlideContent({
   item,
   incoming,
   online,
+  checking,
 }: {
   item: TitleSummary;
   incoming: boolean;
   online: boolean;
+  checking: boolean;
 }) {
   const [resume, setResume] = useState<{ time: number; duration: number; episode: string | null } | null>(null);
 
@@ -125,9 +128,6 @@ function SlideContent({
     <div className="relative z-10 flex h-full flex-col justify-end p-5 sm:p-8 md:p-10">
       <div className="max-w-2xl space-y-3 sm:space-y-3.5">
         <div className="flex flex-wrap items-center gap-2" style={animation(40)}>
-          <span className="rounded bg-[#e50914] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow sm:text-[11px]">
-            Featured
-          </span>
           <span className="rounded border border-white/10 bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white sm:text-[11px]">
             {quality}
           </span>
@@ -146,7 +146,7 @@ function SlideContent({
         </div>
 
         <h1
-          className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-white drop-shadow-lg sm:text-4xl md:text-5xl"
+          className="line-clamp-2 font-display text-[clamp(2.6rem,7vw,5.25rem)] font-normal leading-[0.92] tracking-[0.012em] text-white drop-shadow-lg"
           style={animation(90)}
         >
           {item.title}
@@ -175,13 +175,25 @@ function SlideContent({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2.5 pt-1.5 sm:flex-nowrap sm:gap-3.5" style={animation(190)}>
-          <Link
-            href={watchHref(item)}
-            className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#e50914] px-5 py-2.5 text-xs font-bold text-white shadow-xl shadow-red-950/50 transition hover:bg-red-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-white sm:flex-initial sm:px-6 sm:py-3 sm:text-sm"
-          >
-            <Play className="h-4 w-4 fill-white" />
-            <span>{resume ? 'Resume' : 'Play now'}</span>
-          </Link>
+          {online || checking ? (
+            <Link
+              href={watchHref(item)}
+              className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#e50914] px-5 py-2.5 text-xs font-bold text-white shadow-xl shadow-red-950/50 transition hover:bg-red-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-white sm:flex-initial sm:px-6 sm:py-3 sm:text-sm"
+            >
+              <Play className="h-4 w-4 fill-white" />
+              <span>{checking ? 'Connecting…' : resume ? 'Resume' : 'Play now'}</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="The media server is offline"
+              className="flex min-h-[42px] flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#e50914]/45 px-5 py-2.5 text-xs font-bold text-white/60 sm:flex-initial sm:px-6 sm:py-3 sm:text-sm"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              <span>Server offline</span>
+            </button>
+          )}
 
           <Link
             href={detailsHref(item)}
@@ -195,8 +207,8 @@ function SlideContent({
           <SlideWatchlistButton item={item} />
 
           <span className="ml-1 hidden items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40 lg:flex">
-            <span className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            {online ? 'Direct local stream' : 'Connecting…'}
+            <span className={`h-1.5 w-1.5 rounded-full ${checking ? 'bg-white/40' : online ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            {checking ? 'Connecting...' : online ? 'Direct local stream' : 'Media server offline'}
           </span>
         </div>
       </div>
@@ -209,11 +221,13 @@ function SlideItem({
   incoming,
   style,
   online,
+  checking,
 }: {
   item: TitleSummary;
   incoming: boolean;
   style?: CSSProperties;
   online: boolean;
+  checking: boolean;
 }) {
   const palette = getPosterPalette(`${item.title}-${item.year ?? ''}`);
   const image = heroImage(item);
@@ -247,12 +261,12 @@ function SlideItem({
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0e0e0f] via-[#0e0e0f]/65 to-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_85%_20%,rgba(255,255,255,0.05),transparent_55%)]" />
 
-      <SlideContent item={item} incoming={incoming} online={online} />
+      <SlideContent item={item} incoming={incoming} online={online} checking={checking} />
     </div>
   );
 }
 
-export default function Hero({ items, loading = false, online = true }: HeroProps) {
+export default function Hero({ items, loading = false, online = true, checking = false }: HeroProps) {
   const featured = useMemo(() => {
     const score = (item: TitleSummary) => {
       const title = item.title.trim();
@@ -299,7 +313,8 @@ export default function Hero({ items, loading = false, online = true }: HeroProp
 
   const goToSlide = useCallback(
     (nextIndex: number, dir: 'next' | 'prev') => {
-      if (count <= 1 || animating || nextIndex === index) return;
+      // Clicks during a transition are honoured instead of silently dropped.
+      if (count <= 1 || nextIndex === index) return;
       setPrevIndex(index);
       setIndex(nextIndex);
       setDirection(dir);
@@ -310,7 +325,7 @@ export default function Hero({ items, loading = false, online = true }: HeroProp
         setPrevIndex(null);
       }, 550);
     },
-    [animating, count, index],
+    [count, index],
   );
 
   const goNext = useCallback(() => {
@@ -370,6 +385,7 @@ export default function Hero({ items, loading = false, online = true }: HeroProp
           item={previous}
           incoming={false}
           online={online}
+          checking={checking}
           style={{
             animation:
               direction === 'next'
@@ -385,6 +401,7 @@ export default function Hero({ items, loading = false, online = true }: HeroProp
           item={active}
           incoming={animating}
           online={online}
+          checking={checking}
           style={
             animating
               ? {

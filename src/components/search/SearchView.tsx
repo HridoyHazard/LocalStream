@@ -9,6 +9,7 @@ import {
   FilterX,
   Languages,
   LoaderCircle,
+  RefreshCw,
   Search,
   Sparkles,
   UserRound,
@@ -26,11 +27,21 @@ import Poster from '@/components/media/Poster';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-interface SearchViewProps {
-  initialQuery: string;
+type KindFilter = 'all' | 'movie' | 'series';
+
+export interface SearchInitialFilters {
+  kind?: string;
+  year?: string;
+  genre?: string;
+  language?: string;
+  actor?: string;
+  director?: string;
 }
 
-type KindFilter = 'all' | 'movie' | 'series';
+interface SearchViewProps {
+  initialQuery: string;
+  initialFilters?: SearchInitialFilters;
+}
 
 const RECENT_KEY = 'localstream.searches.v1';
 
@@ -112,14 +123,16 @@ function SpotlightResult({ item }: { item: TitleSummary }) {
   );
 }
 
-export default function SearchView({ initialQuery }: SearchViewProps) {
+export default function SearchView({ initialQuery, initialFilters = {} }: SearchViewProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [kind, setKind] = useState<KindFilter>('all');
-  const [year, setYear] = useState('all');
-  const [genre, setGenre] = useState('all');
-  const [language, setLanguage] = useState('all');
-  const [actor, setActor] = useState('all');
-  const [director, setDirector] = useState('all');
+  const [kind, setKind] = useState<KindFilter>(
+    initialFilters.kind === 'movie' || initialFilters.kind === 'series' ? initialFilters.kind : 'all',
+  );
+  const [year, setYear] = useState(initialFilters.year || 'all');
+  const [genre, setGenre] = useState(initialFilters.genre || 'all');
+  const [language, setLanguage] = useState(initialFilters.language || 'all');
+  const [actor, setActor] = useState(initialFilters.actor || 'all');
+  const [director, setDirector] = useState(initialFilters.director || 'all');
   const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebouncedValue(query.trim(), 220);
@@ -145,8 +158,10 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
   }, [actor, debouncedQuery, director, genre, kind, language, year]);
 
   const searchPath = useMemo(() => {
-    if (!debouncedQuery) return null;
-    const params = new URLSearchParams({ q: debouncedQuery, limit: '80' });
+    const filtered = [kind, year, genre, language, actor, director].some((value) => value !== 'all');
+    if (!debouncedQuery && !filtered) return null;
+    const params = new URLSearchParams({ limit: '80' });
+    if (debouncedQuery) params.set('q', debouncedQuery);
     if (kind !== 'all') params.set('kind', kind);
     if (year !== 'all') params.set('year', year);
     if (genre !== 'all') params.set('genre', genre);
@@ -156,7 +171,10 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
     return `/api/search?${params.toString()}`;
   }, [actor, debouncedQuery, director, genre, kind, language, year]);
 
-  const { data, loading, error } = useApi<SearchResponse>(searchPath, { listenForRefresh: false });
+  const { data, loading, error, refresh } = useApi<SearchResponse>(searchPath, {
+    listenForRefresh: false,
+    keepPreviousData: true,
+  });
   const stale = Boolean(data && searchPath && data.query !== debouncedQuery);
   const showSkeleton = Boolean(searchPath) && (loading || stale) && !error;
 
@@ -383,7 +401,7 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
           )}
         </div>
 
-        {!debouncedQuery ? (
+        {!searchPath ? (
           <div className="space-y-10">
             <section>
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -422,19 +440,25 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
             icon={Search}
             title="Search is unavailable"
             description={`LocalStream could not search the library (${error}). The library index may still be building — try again in a moment.`}
+            action={
+              <button type="button" onClick={() => void refresh()} className="btn btn-primary">
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </button>
+            }
           />
         ) : showSkeleton ? (
           <div>
             <div className="mb-6 flex items-center gap-2 text-[0.72rem] font-medium text-white/35">
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-              Searching the library for “{debouncedQuery}”…
+              {debouncedQuery ? `Searching the library for “${debouncedQuery}”…` : 'Applying filters…'}
             </div>
             <MediaGridSkeleton count={12} />
           </div>
         ) : results.length === 0 ? (
           <EmptyState
             icon={Search}
-            title={`No results for “${debouncedQuery}”`}
+            title={debouncedQuery ? `No results for “${debouncedQuery}”` : 'No titles match those filters'}
             description={
               activeFilterCount
                 ? 'No titles match the search and filters together. Try removing a filter or using a shorter title.'
@@ -462,7 +486,8 @@ export default function SearchView({ initialQuery }: SearchViewProps) {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[0.72rem] font-medium text-white/35">
                 <span className="font-bold text-white/75">{data?.total ?? results.length}</span> result
-                {(data?.total ?? results.length) === 1 ? '' : 's'} for “{debouncedQuery}”
+                {(data?.total ?? results.length) === 1 ? '' : 's'}
+                {debouncedQuery ? <> for “{debouncedQuery}”</> : ' for your filters'}
                 {data ? <span className="text-white/20"> · {data.tookMs} ms</span> : null}
               </p>
               {didYouMean ? (

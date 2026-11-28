@@ -11,6 +11,10 @@ interface PageHeaderProps {
   className?: string;
 }
 
+/**
+ * Page opener. The title is set as a theatrical title card; the count sits on
+ * the title's baseline so it reads as part of the name ("Movies 1,284 films").
+ */
 export default function PageHeader({
   eyebrow,
   title,
@@ -21,37 +25,21 @@ export default function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <section className={cn('relative overflow-hidden border-b border-white/10 bg-[#0e0e0f]', className)}>
-      <div className="pointer-events-none absolute -left-32 -top-40 h-80 w-80 rounded-full bg-[#e50914]/[0.08] blur-[100px]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_120%_at_85%_0%,rgba(255,255,255,0.035),transparent_60%)]" />
-
-      <div className="container-page relative py-7 sm:py-9">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="eyebrow eyebrow-line">{eyebrow}</p>
-            <h1 className="mt-2.5 text-[1.9rem] font-bold leading-[1.05] tracking-[-0.03em] text-white sm:text-[2.5rem]">
-              {title}
-            </h1>
-            <p className="mt-2 max-w-xl text-pretty text-[0.82rem] leading-relaxed text-neutral-400 sm:text-[0.88rem]">
-              {description}
-            </p>
-            {children && <div className="mt-5">{children}</div>}
-          </div>
-
+    <section className={cn('border-b border-white/[0.08] bg-[#0d0d0e]', className)}>
+      <div className="container-page py-8 sm:py-11">
+        <p className="eyebrow">{eyebrow}</p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          <h1 className="font-display text-[clamp(3rem,8vw,5.5rem)] font-normal leading-[0.9] tracking-[0.015em] text-white">
+            {title}
+          </h1>
           {statValue !== undefined && (
-            <div className="hidden shrink-0 items-end gap-3 pb-1 lg:flex">
-              <span className="h-px w-10 bg-gradient-to-r from-transparent to-white/25" />
-              <div className="text-right">
-                <p className="text-[3.2rem] font-bold leading-[0.85] tabular-nums tracking-[-0.04em] text-white/20">
-                  {statValue}
-                </p>
-                <p className="mt-1.5 text-[0.58rem] font-bold uppercase tracking-[0.2em] text-neutral-500">
-                  {statLabel ?? 'Titles indexed'}
-                </p>
-              </div>
-            </div>
+            <p className="text-[0.82rem] font-semibold tabular-nums text-white/45">
+              <span className="text-white/80">{statValue}</span> {(statLabel ?? 'Titles indexed').toLowerCase()}
+            </p>
           )}
         </div>
+        <p className="mt-4 max-w-[60ch] text-pretty text-[0.88rem] leading-relaxed text-neutral-400">{description}</p>
+        {children && <div className="mt-5">{children}</div>}
       </div>
     </section>
   );

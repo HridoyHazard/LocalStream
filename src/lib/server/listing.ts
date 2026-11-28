@@ -1,5 +1,5 @@
 import { decodeEntities } from "@/lib/media/normalize";
-import { serverConfig } from "./config";
+import { mountPath, serverConfig, splitMount, type MediaMount } from "./config";
 
 export interface ListingItem {
   name: string;
@@ -49,30 +49,31 @@ export function parseDirectoryIndexDate(value: string): number {
 }
 
 function directoryUrl(relativePath: string): string {
-  const encoded = relativePath
+  const { mount, rest } = splitMount(relativePath);
+  const encoded = rest
     .split("/")
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  return new URL(encoded ? `${encoded}/` : "", serverConfig.mediaServerUrl).toString();
+  return new URL(encoded ? `${encoded}/` : "", mount.url).toString();
 }
 
-function resolveItemPath(href: string, pageUrl: string): { path: string; isExternal: boolean } | null {
+function resolveItemPath(href: string, pageUrl: string, mount: MediaMount): { path: string; isExternal: boolean } | null {
   try {
     const url = new URL(href, pageUrl);
-    const base = new URL(serverConfig.mediaServerUrl);
+    const base = new URL(mount.url);
     if (url.origin !== base.origin) return { path: "", isExternal: true };
     const basePath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
     if (!url.pathname.startsWith(basePath)) return { path: "", isExternal: true };
     const relative = decodeURIComponent(url.pathname.slice(basePath.length)).replace(/\/+$/, "");
     if (!relative || relative.split("/").some((part) => part === "..")) return null;
-    return { path: relative, isExternal: false };
+    return { path: mountPath(mount, relative), isExternal: false };
   } catch {
     return null;
   }
 }
 
-function parseH5ai(html: string, pageUrl: string): ListingItem[] {
+function parseH5ai(html: string, pageUrl: string, mount: MediaMount): ListingItem[] {
   const items: ListingItem[] = [];
   const rowRegex = /<tr>([\s\S]*?)<\/tr>/g;
   let rowMatch: RegExpExecArray | null;
@@ -82,7 +83,7 @@ function parseH5ai(html: string, pageUrl: string): ListingItem[] {
     if (!hrefMatch) continue;
     const href = decodeEntities(hrefMatch[1]);
     if (!href || href === ".." || href === "./" || href.startsWith("?") || href.startsWith("#")) continue;
-    const resolved = resolveItemPath(href, pageUrl);
+    const resolved = resolveItemPath(href, pageUrl, mount);
     if (!resolved || resolved.isExternal) continue;
 
     const rawName = row.match(/<a [^>]*>([\s\S]*?)<\/a>/)?.[1] ?? "";
@@ -98,14 +99,14 @@ function parseH5ai(html: string, pageUrl: string): ListingItem[] {
   return items;
 }
 
-function parseAutoindex(html: string, pageUrl: string): ListingItem[] {
+function parseAutoindex(html: string, pageUrl: string, mount: MediaMount): ListingItem[] {
   const items: ListingItem[] = [];
   const anchorRegex = /<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match: RegExpExecArray | null;
   while ((match = anchorRegex.exec(html)) !== null) {
     const href = decodeEntities(match[1]);
     if (!href || href === "../" || href === ".." || href.startsWith("?") || href.startsWith("#") || href.startsWith("/_h5ai")) continue;
-    const resolved = resolveItemPath(href, pageUrl);
+    const resolved = resolveItemPath(href, pageUrl, mount);
     if (!resolved || resolved.isExternal || !resolved.path) continue;
     const name = decodeEntities(match[2].replace(/<[^>]+>/g, "")).trim() || resolved.path.split("/").pop() || "";
     if (!name || name === "Parent Directory") continue;
@@ -133,6 +134,7 @@ function parseAutoindex(html: string, pageUrl: string): ListingItem[] {
 
 export async function fetchDirectoryListing(relativePath: string, signal?: AbortSignal): Promise<DirectoryListing> {
   const url = directoryUrl(relativePath);
+  const { mount } = splitMount(relativePath);
   let response: Response;
   try {
     response = await fetch(url, {
@@ -167,10 +169,10 @@ export async function fetchDirectoryListing(relativePath: string, signal?: Abort
 
   const html = await response.text();
   const isH5ai = /h5ai/i.test(html) || /fb-n/.test(html);
-  let items = isH5ai ? parseH5ai(html, url) : parseAutoindex(html, url);
+  let items = isH5ai ? parseH5ai(html, url, mount) : parseAutoindex(html, url, mount);
   if (!isH5ai && items.length === 0) {
     // Some servers render a table identical to h5ai's fallback without branding.
-    items = parseH5ai(html, url);
+    items = parseH5ai(html, url, mount);
   }
   if (items.length === 0 && !isH5ai && !/<a\s/i.test(html)) {
     throw new MediaServerError(
@@ -183,5 +185,5 @@ export async function fetchDirectoryListing(relativePath: string, signal?: Abort
 }
 
 export function rootUrl() {
-  return serverConfig.mediaServerUrl;
+  return splitMount("").mount.url;
 }

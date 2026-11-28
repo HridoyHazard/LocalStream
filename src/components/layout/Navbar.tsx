@@ -65,7 +65,9 @@ export default function Navbar() {
 
   const { data, error, loading, refresh } = useApi<StatsResponse>('/api/stats');
   const scan = data?.scan;
-  const online = Boolean(data) && !error;
+  const reachable = data?.server?.reachable;
+  const online = Boolean(data) && !error && reachable !== false;
+  const statusPending = loading || (Boolean(data) && !error && reachable == null);
   const scanning = Boolean(scan?.running) || syncing;
   const groups = useMemo(() => buildNavGroups(data), [data]);
 
@@ -74,6 +76,7 @@ export default function Navbar() {
     debounced.length >= 2 ? `/api/suggest?q=${encodeURIComponent(debounced)}&limit=6` : null;
   const { data: suggestData, loading: suggestLoading } = useApi<SuggestResponse>(suggestPath, {
     listenForRefresh: false,
+    keepPreviousData: true,
   });
   const suggestions = useMemo<TitleSummary[]>(
     () => (suggestData && suggestData.query === debounced ? suggestData.suggestions : []),
@@ -103,6 +106,14 @@ export default function Navbar() {
     const timer = window.setInterval(() => void refresh(), 3500);
     return () => window.clearInterval(timer);
   }, [scan?.running, refresh]);
+
+  // The first stats response can arrive before the reachability probe has
+  // finished. Retry once so the header does not stay on "Connecting...".
+  useEffect(() => {
+    if (!data || data.server?.reachable != null) return;
+    const timer = window.setTimeout(() => void refresh(), 2800);
+    return () => window.clearTimeout(timer);
+  }, [data, refresh]);
 
   useEffect(() => {
     return () => {
@@ -431,7 +442,7 @@ export default function Navbar() {
                   )}
                 />
                 <span className="font-semibold text-neutral-300">
-                  {loading ? 'Connecting…' : online ? 'Server online' : 'Library offline'}
+                  {statusPending ? 'Connecting…' : online ? 'Server online' : 'Media server offline'}
                 </span>
               </div>
 

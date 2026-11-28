@@ -59,18 +59,23 @@ function decadeOf(year: number) {
   return Math.floor(year / 10) * 10;
 }
 
+function filtersFromParams(params: URLSearchParams): FilterState {
+  const sort = params.get('sort');
+  return {
+    query: params.get('q') ?? '',
+    decade: params.get('decade') ?? 'all',
+    genre: params.get('genre') ?? 'all',
+    category: params.get('category') ?? 'all',
+    language: params.get('language') ?? 'all',
+    sort: (SORTS.some((option) => option.value === sort) ? sort : 'recent') as SortValue,
+  };
+}
+
 export default function BrowseView({ kind, eyebrow, title, description }: BrowseViewProps) {
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<FilterState>(() => ({
-    query: searchParams.get('q') ?? '',
-    decade: searchParams.get('decade') ?? 'all',
-    genre: searchParams.get('genre') ?? 'all',
-    category: searchParams.get('category') ?? 'all',
-    language: searchParams.get('language') ?? 'all',
-    sort: (SORTS.some((option) => option.value === searchParams.get('sort'))
-      ? searchParams.get('sort')
-      : 'recent') as SortValue,
-  }));
+  const [filters, setFilters] = useState<FilterState>(() => filtersFromParams(searchParams));
+  // The query string this component last wrote itself; anything else is an outside navigation.
+  const lastWritten = useRef(searchParams.toString());
   const [debouncedQuery, setDebouncedQuery] = useState(filters.query);
   const [items, setItems] = useState<TitleSummary[]>([]);
   const [facets, setFacets] = useState<BrowseResponse['facets']>({ years: [], genres: [], categories: [] });
@@ -79,7 +84,10 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
   const [hasMore, setHasMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveSection, setLiveSection] = useState<BrowseResponse['section']>(undefined);
+  const [liveOffline, setLiveOffline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [progressMap, setProgressMap] = useState<Map<string, number>>(new Map());
   const sequence = useRef(0);
@@ -135,9 +143,21 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
     params.delete('page');
     if (params.get('sort') === 'recent') params.delete('sort');
     const query = params.toString();
+    lastWritten.current = query;
     const next = `${window.location.pathname}${query ? `?${query}` : ''}`;
     window.history.replaceState(null, '', next);
   }, [baseQuery]);
+
+  // Menu links such as /movies?genre=Action keep this component mounted, so the
+  // filters must follow the address bar when something else changes it.
+  const urlQuery = searchParams.toString();
+  useEffect(() => {
+    if (urlQuery === lastWritten.current) return;
+    lastWritten.current = urlQuery;
+    const next = filtersFromParams(new URLSearchParams(urlQuery));
+    setFilters(next);
+    setDebouncedQuery(next.query);
+  }, [urlQuery]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -147,8 +167,12 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
     setItems([]);
     setPage(1);
     setHasMore(false);
+    setLoadMoreFailed(false);
+    setLoadingMore(false);
+    setLiveSection(undefined);
+    setLiveOffline(false);
 
-    apiGet<BrowseResponse>(`/api/titles?${baseQuery}&page=1`, controller.signal)
+    apiGet<BrowseResponse>(`/api/titles?${baseQuery}&page=1`, controller.signal, { force: reloadKey > 0 })
       .then((response) => {
         if (sequence.current !== id) return;
         setItems(response.items);
@@ -156,6 +180,8 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
         setTotal(response.total);
         setPage(response.page);
         setHasMore(response.hasMore);
+        setLiveSection(response.section);
+        setLiveOffline(Boolean(response.offline));
       })
       .catch((cause) => {
         if (sequence.current !== id || (cause instanceof DOMException && cause.name === 'AbortError')) return;
@@ -169,11 +195,14 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
   }, [baseQuery, reloadKey]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || initialLoading || !hasMore) return;
+    if (loadingMore || initialLoading || !hasMore || loadMoreFailed) return;
+    const id = sequence.current;
     setLoadingMore(true);
     try {
       const next = page + 1;
       const response = await apiGet<BrowseResponse>(`/api/titles?${baseQuery}&page=${next}`);
+      // Filters changed while this page was loading: its items belong to the old list.
+      if (sequence.current !== id) return;
       setItems((current) => {
         const seen = new Set(current.map((item) => item.id));
         return [...current, ...response.items.filter((item) => !seen.has(item.id))];
@@ -182,11 +211,11 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
       setHasMore(response.hasMore);
       setTotal(response.total);
     } catch {
-      setHasMore(false);
+      if (sequence.current === id) setLoadMoreFailed(true);
     } finally {
-      setLoadingMore(false);
+      if (sequence.current === id) setLoadingMore(false);
     }
-  }, [baseQuery, hasMore, initialLoading, loadingMore, page]);
+  }, [baseQuery, hasMore, initialLoading, loadMoreFailed, loadingMore, page]);
 
   useEffect(() => {
     const element = sentinelRef.current;
@@ -225,6 +254,9 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
   }, [facets.years]);
 
   const languages = statsData?.languages ?? [];
+  const liveSections = (statsData?.live?.sections ?? []).filter(
+    (section) => section.count > 0 && section.kind === kind,
+  );
   const totalForKind = kind === 'movie' ? stats?.movies : stats?.series;
 
   return (
@@ -234,7 +266,7 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
         title={title}
         description={description}
         statValue={totalForKind ? totalForKind.toLocaleString() : '—'}
-        statLabel={kind === 'movie' ? 'Films indexed' : 'Series indexed'}
+        statLabel={kind === 'movie' ? 'Films available' : 'Series available'}
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="chip !h-8">
@@ -243,7 +275,7 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
           </span>
           <span className="chip !h-8">
             <Sparkles className="h-3 w-3 text-accent-300" />
-            {stats?.episodes.toLocaleString() ?? '—'} episodes
+            {stats?.episodes.toLocaleString() ?? '—'} episodes indexed
           </span>
           {scan?.running ? (
             <span className="chip !h-8 border-accent/25 bg-accent/[0.07] text-accent-200">
@@ -414,6 +446,79 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
           </div>
         )}
 
+        {liveSection && liveOffline ? (
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300/80" />
+              <p className="text-[0.72rem] leading-relaxed text-amber-100/70">
+                <span className="font-semibold text-amber-200/90">{liveSection.label}</span> is served by a media
+                server that is offline right now. You can browse the cached catalogue, but streaming resumes when the
+                server is reachable again.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReloadKey((value) => value + 1)}
+              className="inline-flex shrink-0 items-center gap-1.5 text-[0.68rem] font-semibold text-amber-200 transition-colors hover:text-amber-100"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {!liveSection && statsData?.server?.reachable === false ? (
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300/80" />
+              <p className="text-[0.72rem] leading-relaxed text-amber-100/70">
+                <span className="font-semibold text-amber-200/90">Your primary media server is offline.</span>{' '}
+                LocalStream cannot reach{' '}
+                <span className="font-medium text-amber-100/80">{statsData.server.url}</span>
+                {statsData.server.reachability?.error ? (
+                  <span className="text-amber-100/50"> ({statsData.server.reachability.error})</span>
+                ) : null}
+                . The indexed catalogue stays browsable, but playback and new scans resume when the server is
+                reachable again.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setReloadKey((value) => value + 1);
+                window.dispatchEvent(new Event('localstream:refresh'));
+              }}
+              className="inline-flex shrink-0 items-center gap-1.5 text-[0.68rem] font-semibold text-amber-200 transition-colors hover:text-amber-100"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {liveSections.length ? (
+          <div className="mb-6 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[0.58rem] font-bold uppercase tracking-[0.16em] text-white/25">
+              Streaming servers
+            </span>
+            {liveSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setFilter('category', filters.category === section.label ? 'all' : section.label)}
+                className={cn(
+                  'chip !h-7 text-[0.66rem]',
+                  filters.category === section.label && 'chip-active',
+                )}
+                title={`${section.count.toLocaleString()} titles on ${section.server}`}
+              >
+                {section.label}
+                <span className="text-[0.58rem] opacity-50">{section.count.toLocaleString()}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {error ? (
           <EmptyState
             icon={Film}
@@ -435,13 +540,27 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
         ) : items.length === 0 ? (
           <EmptyState
             icon={activeFilterCount ? FilterX : kind === 'movie' ? Film : Tv}
-            title={activeFilterCount ? 'No titles match those filters' : kind === 'movie' ? 'No films indexed yet' : 'No series indexed yet'}
+            title={
+              activeFilterCount
+                ? 'No titles match those filters'
+                : liveOffline
+                  ? 'This server is offline'
+                  : liveSection
+                    ? 'Catalogue is loading'
+                    : kind === 'movie'
+                      ? 'No films indexed yet'
+                      : 'No series indexed yet'
+            }
             description={
               activeFilterCount
                 ? 'Try a different search term, year or genre, or clear the filters to see the whole collection.'
-                : scan?.running
-                  ? 'The first scan is still running. Titles will appear here as soon as they are indexed.'
-                  : 'Run a library scan to bring movies and series from your media server into LocalStream.'
+                : liveOffline
+                  ? `${liveSection?.label ?? 'This collection'} is served by an extra media server that cannot be reached right now. Reconnect to the ISP network and retry.`
+                  : liveSection
+                    ? `${liveSection.label} is being catalogued from its server. This usually finishes within a few seconds — retry in a moment.`
+                    : scan?.running
+                      ? 'The first scan is still running. Titles will appear here as soon as they are indexed.'
+                      : 'Run a library scan to bring movies and series from your media server into LocalStream.'
             }
             action={
               activeFilterCount ? (
@@ -484,6 +603,15 @@ export default function BrowseView({ kind, eyebrow, title, description }: Browse
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                   Loading more titles…
                 </span>
+              ) : loadMoreFailed ? (
+                <button
+                  type="button"
+                  onClick={() => setLoadMoreFailed(false)}
+                  className="btn btn-ghost btn-sm"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Could not load more. Retry
+                </button>
               ) : hasMore ? (
                 <button type="button" onClick={() => void loadMore()} className="btn btn-ghost btn-sm">
                   <ArrowDown className="h-3.5 w-3.5" />

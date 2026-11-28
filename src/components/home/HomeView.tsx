@@ -66,7 +66,17 @@ export default function HomeView() {
   }, []);
 
   const stats = data?.stats;
-  const online = Boolean(stats && stats.titles > 0) && !error;
+  const reachability = data?.serverReachable;
+  const online = Boolean(stats) && !error && reachability !== false;
+  const statusPending = loading || (Boolean(data) && !error && reachability == null);
+
+  // The first home response can arrive before the reachability probe has
+  // finished. Retry once so the hero and status pill settle quickly.
+  useEffect(() => {
+    if (!data || data.serverReachable != null) return;
+    const timer = window.setTimeout(() => void refresh(), 2800);
+    return () => window.clearTimeout(timer);
+  }, [data, refresh]);
 
   const handleRemoveContinue = useCallback((titleId: string) => {
     removeProgress(titleId);
@@ -106,7 +116,7 @@ export default function HomeView() {
   return (
     <div className="container-page py-4 sm:py-6">
       <div className="space-y-7 sm:space-y-9">
-        <Hero items={data?.hero ?? []} loading={loading && !data} online={online} />
+        <Hero items={data?.hero ?? []} loading={loading && !data} online={online} checking={statusPending} />
 
         {!loading && !data && (
           <EmptyState
@@ -198,7 +208,7 @@ export default function HomeView() {
                     <h2 className="text-base font-bold tracking-tight text-white sm:text-lg">Your library</h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusPill online={online} loading={loading} />
+                    <StatusPill online={online} loading={statusPending} />
                     <button
                       type="button"
                       onClick={() => void sync()}

@@ -13,6 +13,7 @@ interface SectionHeadingProps {
   className?: string;
 }
 
+/** Title, a hairline that shows how wide the row is, then the row's action. */
 export default function SectionHeading({
   eyebrow,
   title,
@@ -23,31 +24,23 @@ export default function SectionHeading({
   className,
 }: SectionHeadingProps) {
   return (
-    <div className={cn('mb-4 flex items-end justify-between gap-4 sm:mb-5', className)}>
-      <div className="min-w-0">
-        {eyebrow && <p className="eyebrow mb-1.5">{eyebrow}</p>}
-        <div className="flex items-center gap-2">
-          <span className="h-4 w-1 shrink-0 rounded-sm bg-[#e50914]" />
-          <h2 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">{title}</h2>
-          {count && (
-            <span className="hidden rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-300 sm:inline">
-              {count}
-            </span>
-          )}
-        </div>
+    <div className={cn('mb-4 sm:mb-5', className)}>
+      {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
+      <div className="flex items-baseline gap-4">
+        <h2 className="section-heading shrink-0">{title}</h2>
+        {count && <span className="hidden shrink-0 text-[0.74rem] font-semibold text-white/35 sm:inline">{count}</span>}
+        <span aria-hidden="true" className="h-px min-w-6 flex-1 self-center bg-white/[0.09]" />
+        {children}
+        {!children && actionLabel && actionHref && (
+          <Link
+            href={actionHref}
+            className="group inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-neutral-400 transition-colors hover:text-white"
+          >
+            {actionLabel}
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </Link>
+        )}
       </div>
-
-      {children}
-
-      {!children && actionLabel && actionHref && (
-        <Link
-          href={actionHref}
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-neutral-400 transition hover:bg-white/5 hover:text-white"
-        >
-          {actionLabel}
-          <ArrowRight className="h-3.5 w-3.5 text-[#e50914] transition-transform duration-300 group-hover:translate-x-0.5" />
-        </Link>
-      )}
     </div>
   );
 }

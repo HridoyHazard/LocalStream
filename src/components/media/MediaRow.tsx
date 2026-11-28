@@ -24,6 +24,7 @@ interface MediaRowProps {
 }
 
 export default function MediaRow({
+  eyebrow,
   title,
   items,
   loading = false,
@@ -74,23 +75,20 @@ export default function MediaRow({
 
   return (
     <section className={cn(className)}>
-      <div className="flex items-center justify-between pb-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="h-4 w-1 shrink-0 rounded-sm bg-[#e50914]" />
-          <h2 className="truncate text-base font-bold tracking-tight text-white sm:text-lg">{title}</h2>
-          <span className="hidden rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-300 sm:inline">
-            {items.length}
-          </span>
-        </div>
+      <div className="flex items-baseline gap-4 pb-2">
+        <h2 className="section-heading min-w-0 truncate" title={eyebrow}>
+          {title}
+        </h2>
+        <span aria-hidden="true" className="h-px min-w-6 flex-1 self-center bg-white/[0.09]" />
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 self-center">
           {actionHref ? (
             <Link
               href={actionHref}
               className="group inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-neutral-400 transition hover:bg-white/5 hover:text-white"
             >
               <span>{actionLabel}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-[#e50914] transition-transform group-hover:translate-x-0.5" />
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           ) : null}
 

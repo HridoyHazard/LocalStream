@@ -68,8 +68,9 @@ export function episodeCode(season?: number | null, episode?: number | null) {
  * truthful for the local library.
  */
 export function qualityLabel(
-  title: Pick<TitleSummary, 'title' | 'category' | 'kind'> & { totalSize?: number | null },
+  title: Pick<TitleSummary, 'title' | 'category' | 'kind'> & { totalSize?: number | null; quality?: string | null },
 ) {
+  if (title.quality) return title.quality;
   const haystack = `${title.title} ${title.category ?? ''}`;
   const match = haystack.match(/\b(2160p|1080p|720p|480p|4k|uhd)\b/i);
   if (match) {

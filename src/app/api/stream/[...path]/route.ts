@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mediaUrlForPath, mimeTypeForPath } from "@/lib/server/config";
+import { isPathReachableFast, markPathOffline } from "@/lib/server/reachability";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -84,6 +85,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const upstreamUrl = mediaUrlForPath(relativePath);
   const range = request.headers.get("range");
 
+  if (!(await isPathReachableFast(relativePath))) {
+    return NextResponse.json(
+      { error: "The media server is offline", detail: "Reconnect to the ISP network and try again." },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+    );
+  }
+
   const upstreamHeaders: Record<string, string> = {
     "User-Agent": "LocalStream/1.0 (+local media proxy)",
     Accept: "*/*",
@@ -101,6 +109,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       signal: request.signal, // stop pulling from the ISP server when the viewer leaves or seeks
     });
   } catch (error) {
+    markPathOffline(relativePath);
     return badUpstream(error, upstreamUrl);
   }
 
@@ -145,6 +154,13 @@ export async function HEAD(_request: NextRequest, { params }: { params: Promise<
   const relativePath = decoded.join("/");
   const upstreamUrl = mediaUrlForPath(relativePath);
 
+  if (!(await isPathReachableFast(relativePath))) {
+    return NextResponse.json(
+      { error: "The media server is offline", detail: "Reconnect to the ISP network and try again." },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+    );
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(upstreamUrl, {
@@ -156,8 +172,10 @@ export async function HEAD(_request: NextRequest, { params }: { params: Promise<
       },
       cache: "no-store",
       redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (error) {
+    markPathOffline(relativePath);
     return badUpstream(error, upstreamUrl);
   }
 

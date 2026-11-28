@@ -170,7 +170,38 @@ export function searchTitles(options: SearchOptions): SearchResponse {
     didYouMean: null,
     suggestions: [],
   };
-  if (!raw) return empty;
+  if (!raw) {
+    // No text, but filters such as an actor or genre still make a valid search.
+    const hasFilter = Boolean(
+      options.genre ||
+        options.year ||
+        options.language ||
+        options.category ||
+        options.actor ||
+        options.director ||
+        (options.kind && options.kind !== "all"),
+    );
+    if (!hasFilter) return empty;
+    const matches = getIndex()
+      .docs.filter((doc) => {
+        const item = doc.item;
+        if (options.kind && options.kind !== "all" && item.kind !== options.kind) return false;
+        if (options.genre && !item.genres.some((genre) => genre.toLowerCase() === options.genre!.toLowerCase())) return false;
+        if (options.language && item.language !== options.language) return false;
+        if (options.category && item.category !== options.category) return false;
+        if (options.year && item.year !== options.year) return false;
+        if (options.actor && !personMatches(options.actor, doc.cast)) return false;
+        if (options.director && !personMatches(options.director, doc.directors)) return false;
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (b.item.rating ?? 0) - (a.item.rating ?? 0) || (b.item.popularity ?? 0) - (a.item.popularity ?? 0),
+      )
+      .slice(0, limit);
+    const hits: SearchHit[] = matches.map((doc) => ({ ...doc.item, score: 1, matchedTitle: doc.title }));
+    return { ...empty, total: hits.length, tookMs: Date.now() - started, results: hits, suggestions: hits.slice(0, 6) };
+  }
 
   const explicitYear = options.year ?? null;
   const queryYear = yearFromQuery(raw);

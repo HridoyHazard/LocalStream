@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { mediaUrlForPath } from "@/lib/server/config";
 import { extensionOf, isSubtitleFile } from "@/lib/media/normalize";
 import { normalizeMediaPath } from "@/lib/server/paths";
+import { isPathReachableFast } from "@/lib/server/reachability";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -76,6 +77,13 @@ export async function GET(request: NextRequest) {
   const relativePath = normalizeMediaPath(request.nextUrl.searchParams.get("path"));
   if (!relativePath || !isSubtitleFile(relativePath)) {
     return NextResponse.json({ error: "A valid subtitle path is required" }, { status: 400 });
+  }
+
+  if (!(await isPathReachableFast(relativePath))) {
+    return NextResponse.json(
+      { error: "The media server is offline, so this subtitle cannot be loaded right now." },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+    );
   }
 
   let upstream: Response;

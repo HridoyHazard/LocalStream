@@ -33,8 +33,9 @@ function count(value?: number) {
 export function buildNavGroups(stats?: StatsResponse | null): NavGroup[] {
   const movieCategories = (stats?.facets.movies.categories ?? []).slice(0, 4);
   const seriesCategories = (stats?.facets.series.categories ?? []).slice(0, 4);
-  const genres = (stats?.facets.all.genres ?? []).slice(0, 5);
+  const genres = (stats?.facets.movies.genres ?? []).slice(0, 5);
   const totals = stats?.stats;
+  const liveSections = (stats?.live?.sections ?? []).filter((section) => section.count > 0);
 
   const movieItems: NavGroupItem[] = [
     { label: 'All movies', href: '/movies', hint: count(totals?.movies), icon: Film },
@@ -64,6 +65,13 @@ export function buildNavGroups(stats?: StatsResponse | null): NavGroup[] {
       }))
     : [{ label: 'Browse collections', href: '/genres', icon: Layers }];
 
+  const liveItems: NavGroupItem[] = liveSections.slice(0, 9).map((section) => ({
+    label: section.label,
+    href: `${section.kind === 'series' ? '/series' : '/movies'}?category=${encodeURIComponent(section.label)}`,
+    hint: count(section.count),
+    icon: section.kind === 'series' ? Tv : Clapperboard,
+  }));
+
   return [
     {
       name: 'Browse',
@@ -77,6 +85,7 @@ export function buildNavGroups(stats?: StatsResponse | null): NavGroup[] {
     },
     { name: 'Movies', items: movieItems },
     { name: 'Series & TV', items: seriesItems },
+    ...(liveItems.length ? [{ name: 'Streaming servers', items: liveItems }] : []),
     {
       name: 'Discover',
       items: [

@@ -5,8 +5,77 @@ function normalizeBaseUrl(value: string) {
   return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
 }
 
+/**
+ * A media server LocalStream can read from. The primary server keeps plain
+ * library paths ("English Movies/Film (2020)/film.mkv"). Every extra server
+ * adds a "~<id>/" prefix to its paths ("~14/Hindi Movies/..."), so one path
+ * always says which server owns the file.
+ */
+export interface MediaMount {
+  id: string;
+  url: string;
+  label: string;
+}
+
+export const MOUNT_PREFIX = "~";
+
+const PRIMARY_URL = normalizeBaseUrl(process.env.MEDIA_SERVER_URL || "http://172.16.50.7/DHAKA-FLIX-7/");
+
+const DEFAULT_EXTRA_SERVERS: MediaMount[] = [
+  { id: "14", url: "http://172.16.50.14/DHAKA-FLIX-14/", label: "Server 14" },
+  { id: "12", url: "http://172.16.50.12/DHAKA-FLIX-12/", label: "Server 12" },
+  { id: "10", url: "http://172.16.50.10/DHAKA-FLIX-10/", label: "Server 10" },
+];
+
+/**
+ * EXTRA_MEDIA_SERVERS="14=http://172.16.50.14/DHAKA-FLIX-14/,12=http://..." replaces the
+ * defaults (empty string disables them). ENABLE_EXTRA_SERVERS=false also disables them.
+ */
+function parseExtraMounts(): MediaMount[] {
+  if (process.env.ENABLE_EXTRA_SERVERS === "false") return [];
+  const raw = process.env.EXTRA_MEDIA_SERVERS;
+  let candidates: MediaMount[] = DEFAULT_EXTRA_SERVERS;
+  if (raw !== undefined) {
+    candidates = raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const eq = entry.indexOf("=");
+        const id = eq > 0 ? entry.slice(0, eq).trim() : "";
+        const url = eq > 0 ? entry.slice(eq + 1).trim() : "";
+        return { id, url, label: `Server ${id}` };
+      });
+  }
+  const seen = new Set<string>();
+  const mounts: MediaMount[] = [];
+  for (const candidate of candidates) {
+    if (!/^[a-z0-9]{1,12}$/i.test(candidate.id) || seen.has(candidate.id)) continue;
+    try {
+      new URL(candidate.url);
+    } catch {
+      continue;
+    }
+    const url = normalizeBaseUrl(candidate.url);
+    if (url === PRIMARY_URL) continue;
+    seen.add(candidate.id);
+    mounts.push({ id: candidate.id, url, label: candidate.label });
+  }
+  return mounts;
+}
+
+const MOUNTS: MediaMount[] = [{ id: "", url: PRIMARY_URL, label: "Primary server" }, ...parseExtraMounts()];
+
 export const serverConfig = {
-  mediaServerUrl: normalizeBaseUrl(process.env.MEDIA_SERVER_URL || "http://172.16.50.7/DHAKA-FLIX-7/"),
+  mediaServerUrl: PRIMARY_URL,
+  mounts: MOUNTS,
+  reachabilityTimeoutMs: Math.max(300, Number(process.env.REACHABILITY_TIMEOUT_MS || 2500)),
+  /**
+   * Set REACHABILITY_DISABLED=true to skip the reachability probe entirely and
+   * always attempt the real request. Use this if a server rejects/starves the
+   * probe but still streams fine (for example behind a slow reverse proxy).
+   */
+  reachabilityDisabled: process.env.REACHABILITY_DISABLED === "true",
   appName: process.env.NEXT_PUBLIC_APP_NAME || "LocalStream",
   databasePath: path.resolve(process.cwd(), process.env.DATABASE_PATH || "data/localstream.db"),
   scanOnStart: process.env.SCAN_ON_START !== "false",
@@ -58,12 +127,29 @@ export function mimeTypeForPath(path: string): string | null {
   return MIME_TYPES[extension] ?? null;
 }
 
+/** Splits a library path into the server that owns it and the path on that server. */
+export function splitMount(relativePath: string): { mount: MediaMount; rest: string } {
+  if (relativePath.startsWith(MOUNT_PREFIX)) {
+    const slash = relativePath.indexOf("/");
+    const id = relativePath.slice(MOUNT_PREFIX.length, slash === -1 ? undefined : slash);
+    const mount = id ? MOUNTS.find((candidate) => candidate.id === id) : undefined;
+    if (mount) return { mount, rest: slash === -1 ? "" : relativePath.slice(slash + 1) };
+  }
+  return { mount: MOUNTS[0], rest: relativePath };
+}
+
+/** Inverse of splitMount: builds the library path for a path on a given server. */
+export function mountPath(mount: MediaMount, rest: string): string {
+  if (!mount.id) return rest;
+  return rest ? `${MOUNT_PREFIX}${mount.id}/${rest}` : `${MOUNT_PREFIX}${mount.id}`;
+}
+
 export function mediaUrlForPath(relativePath: string): string {
-  const base = serverConfig.mediaServerUrl;
-  const encoded = relativePath
+  const { mount, rest } = splitMount(relativePath);
+  const encoded = rest
     .split("/")
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  return new URL(encoded, base).toString();
+  return new URL(encoded, mount.url).toString();
 }

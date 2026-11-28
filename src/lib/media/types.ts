@@ -56,6 +56,23 @@ export interface TitleSummary {
   episodeCount?: number;
   seasonCount?: number;
   popularity?: number;
+  /** Resolution derived from the folder name for live (non-indexed) titles. */
+  quality?: string | null;
+}
+
+/** A curated folder on one of the extra ISP servers, exposed in the UI. */
+export interface LiveSectionSummary {
+  id: string;
+  label: string;
+  kind: MediaKind;
+  language: string | null;
+  count: number;
+  server: string;
+}
+
+export interface LiveStats {
+  sections: LiveSectionSummary[];
+  totals: { titles: number; movies: number; series: number };
 }
 
 export interface Episode {
@@ -96,6 +113,12 @@ export interface TitleDetail extends TitleSummary {
   seasons: number[];
   tmdbUrl: string | null;
   imdbId: string | null;
+  /**
+   * Whether the owning media server answered when the title was resolved.
+   * "offline" means the catalogue entry is readable but streaming is
+   * unavailable until the server is back.
+   */
+  availability?: "online" | "offline" | "unknown";
 }
 
 export interface HomeSection {
@@ -121,6 +144,10 @@ export interface HomeData {
   scan: ScanStatus;
   collections: { name: string; count: number }[];
   genres: string[];
+  /** Cached primary-server reachability; null until the first probe finishes. */
+  serverReachable?: boolean | null;
+  /** Curated extra-server catalogs (live, not SQLite-indexed). */
+  live?: LiveStats;
 }
 
 export interface ScanStatus {
@@ -162,6 +189,15 @@ export interface BrowseResponse {
     genres: string[];
     categories: string[];
   };
+  /** Present when the page is served from a live extra-server section. */
+  section?: {
+    id: string;
+    label: string;
+    kind: MediaKind;
+    count: number;
+  };
+  /** True when the live section's server is known to be unreachable. */
+  offline?: boolean;
 }
 
 export interface MetadataStatus {
@@ -201,6 +237,10 @@ export interface StatsResponse {
   server: {
     url: string;
     protocol: string;
+    /** Cached primary-server reachability; null until the first probe finishes. */
+    reachable?: boolean | null;
+    /** Non-blocking probe details (last error, when it was checked). */
+    reachability?: { online: boolean; checkedAt: number; error: string | null } | null;
     info: Record<string, unknown> | null;
     streaming: {
       status?: number;
@@ -220,4 +260,6 @@ export interface StatsResponse {
   languages: { name: string; count: number }[];
   people: { name: string; count: number }[];
   directors: { name: string; count: number }[];
+  /** Curated extra-server catalogs (live, not SQLite-indexed). */
+  live?: LiveStats;
 }

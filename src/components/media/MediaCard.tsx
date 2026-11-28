@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Bookmark, BookmarkCheck, Info, Play, Star, X } from 'lucide-react';
 import type { TitleSummary } from '@/lib/media/types';
@@ -26,7 +26,7 @@ function ratingLabel(value: number | null) {
   return (Math.round(value * 10) / 10).toFixed(1);
 }
 
-export default function MediaCard({
+function MediaCard({
   item,
   progress,
   href,
@@ -69,7 +69,7 @@ export default function MediaCard({
         </Link>
 
         <div className="pointer-events-none absolute left-2 top-2 z-10">
-          <span className="rounded-md bg-[#e50914] px-2 py-0.5 text-[10px] font-bold text-white shadow-md">{quality}</span>
+          <span className="rounded-md bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white/85 backdrop-blur-sm">{quality}</span>
         </div>
 
         <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
@@ -139,7 +139,7 @@ export default function MediaCard({
       <div className="space-y-0.5 px-0.5 pt-2">
         <Link
           href={destination}
-          className="block truncate text-xs font-semibold text-neutral-200 transition-colors group-hover:text-[#e50914] sm:text-sm"
+          className="block truncate text-xs font-semibold text-neutral-200 transition-colors group-hover:text-white sm:text-sm"
           title={item.title}
         >
           {item.title}
@@ -160,3 +160,6 @@ export default function MediaCard({
     </article>
   );
 }
+
+// Typing in a filter box re-renders the page; memo keeps unchanged cards out of it.
+export default memo(MediaCard);

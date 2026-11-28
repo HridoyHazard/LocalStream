@@ -1,10 +1,11 @@
 import { Suspense } from 'react';
 import BrowseView from '@/components/browse/BrowseView';
+import BrowseFallback from '@/components/browse/BrowseFallback';
 
 export default function SeriesPage() {
   // BrowseView calls useSearchParams(); Next 15 fails `next build` without a Suspense boundary.
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<BrowseFallback />}>
       <BrowseView
         kind="series"
         eyebrow="Episodic storytelling"

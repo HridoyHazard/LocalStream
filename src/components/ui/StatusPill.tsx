@@ -9,7 +9,7 @@ interface StatusPillProps {
 }
 
 export default function StatusPill({ online, loading, label, className, compact }: StatusPillProps) {
-  const text = loading ? 'Syncing' : label ?? (online ? 'Server online' : 'Library offline');
+  const text = loading ? 'Connecting…' : label ?? (online ? 'Server online' : 'Media server offline');
 
   return (
     <span

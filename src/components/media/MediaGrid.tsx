@@ -11,7 +11,7 @@ interface MediaGridProps {
   progressFor?: (item: TitleSummary) => number | undefined;
 }
 
-export default function MediaGrid({ items, className, animate = true, progressFor }: MediaGridProps) {
+export default function MediaGrid({ items, className, animate = false, progressFor }: MediaGridProps) {
   return (
     <div
       className={cn(

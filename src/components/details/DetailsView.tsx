@@ -16,6 +16,7 @@ import {
   Info,
   Languages,
   ListVideo,
+  LoaderCircle,
   MonitorPlay,
   Play,
   Radio,
@@ -88,6 +89,14 @@ function DetailsSkeleton() {
         <div className="absolute inset-0 bg-[radial-gradient(90%_120%_at_78%_8%,#241318_0%,transparent_56%),linear-gradient(152deg,#12090b_0%,#070709_65%)]" />
         <div className="hero-veil" />
         <div className="container-page relative z-10 py-8 sm:py-10">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/45"
+          >
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin text-accent-300" />
+            Loading title…
+          </div>
           <div className="skeleton h-3 w-56 rounded-full" />
           <div className="mt-9 grid gap-10 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]">
             <div className="skeleton mx-auto aspect-[2/3] w-full max-w-[17rem] rounded-[20px] lg:mx-0 lg:max-w-none" />
@@ -117,7 +126,6 @@ function DetailsSkeleton() {
 
 export default function DetailsView({ titleId }: DetailsViewProps) {
   const [response, setResponse] = useState<TitleDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [progress, setProgress] = useState<ProgressRecord | null>(null);
@@ -127,6 +135,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
   const [copyKey, setCopyKey] = useState<string>('path');
   const [vlcDirect, setVlcDirect] = useState(false);
   const copyTimer = useRef<number | null>(null);
+  const lastTitleId = useRef(titleId);
 
   useEffect(() => {
     try {
@@ -146,20 +155,34 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
   };
 
   useEffect(() => {
+    let active = true;
     const controller = new AbortController();
-    setLoading(true);
+    const titleChanged = lastTitleId.current !== titleId;
+    lastTitleId.current = titleId;
+    if (titleChanged) {
+      // Never show the previous title while the new one is loading.
+      setResponse(null);
+      setSeason(null);
+    }
     setError(null);
-    apiGet<TitleDetailResponse>(`/api/titles/${encodeURIComponent(titleId)}`, controller.signal)
+    apiGet<TitleDetailResponse>(`/api/titles/${encodeURIComponent(titleId)}`, controller.signal, {
+      force: reloadKey > 0,
+    })
       .then((data) => {
+        if (!active) return;
         setResponse(data);
         setSeason((current) => current ?? data.title.seasons[0] ?? null);
       })
       .catch((cause) => {
+        if (!active) return;
         if (cause instanceof DOMException && cause.name === 'AbortError') return;
         setError(cause instanceof Error ? cause.message : 'The title could not be loaded');
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
+      });
+    return () => {
+      // A superseded/aborted request must not write state.
+      active = false;
+      controller.abort();
+    };
   }, [titleId, reloadKey]);
 
   useEffect(() => {
@@ -271,36 +294,45 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
     void copy(`${window.location.origin}${link}`, scope ? `m3u-${scope}` : 'm3u');
   };
 
-  if (loading && !response) return <DetailsSkeleton />;
+  const errorScreen = (
+    <div className="container-page page-shell">
+      <EmptyState
+        icon={Film}
+        title="This title could not be found"
+        description={
+          error
+            ? `LocalStream could not load this title (${error}). It may have been removed from the library, or the scan may still be running.`
+            : 'This title is not in the library index. Run a scan or return to the collection.'
+        }
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="btn btn-primary">
+              Retry
+            </button>
+            <Link href="/movies" className="btn btn-ghost">
+              Browse movies
+            </Link>
+          </div>
+        }
+      />
+    </div>
+  );
 
-  if (error || !title) {
-    return (
-      <div className="container-page page-shell">
-        <EmptyState
-          icon={Film}
-          title="This title could not be found"
-          description={
-            error
-              ? `LocalStream could not load this title (${error}). It may have been removed from the library, or the scan may still be running.`
-              : 'This title is not in the library index. Run a scan or return to the collection.'
-          }
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="btn btn-primary">
-                Retry
-              </button>
-              <Link href="/movies" className="btn btn-ghost">
-                Browse movies
-              </Link>
-            </div>
-          }
-        />
-      </div>
-    );
+  if (!response) {
+    // Before the first payload there is nothing to call "not found" — show the
+    // loader until the real response (or a real error) arrives.
+    return error ? errorScreen : <DetailsSkeleton />;
+  }
+
+  if (!title) {
+    return errorScreen;
   }
 
   const related = response?.related ?? [];
   const recommendations = response?.recommendations ?? [];
+  const offline = title.availability === 'offline';
+  const hasStream = isSeries ? title.episodes.length > 0 : Boolean(title.filePath);
+  const playable = hasStream && !offline;
   const resumeHref = watchHref(title, {
     episode: isSeries ? progressTarget : null,
   });
@@ -357,6 +389,27 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
             <span className="max-w-[16rem] truncate text-white/60">{title.title}</span>
           </nav>
 
+          {offline || !hasStream ? (
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-300/80" />
+                <p className="text-[0.74rem] leading-relaxed text-amber-100/70">
+                  {offline
+                    ? 'The media server for this title is offline. The catalogue details are available, but playback and episode lists return as soon as you reconnect to the ISP network.'
+                    : 'The media file for this title could not be located. Playback is unavailable until the server lists it again.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReloadKey((value) => value + 1)}
+                className="inline-flex shrink-0 items-center gap-1.5 text-[0.68rem] font-semibold text-amber-200 transition-colors hover:text-amber-100"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Retry
+              </button>
+            </div>
+          ) : null}
+
           <div className="mt-8 grid gap-10 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-14 xl:grid-cols-[20rem_minmax(0,1fr)]">
             <div className="mx-auto w-full max-w-[17rem] lg:mx-0 lg:max-w-none">
               <div className="relative">
@@ -377,7 +430,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                 <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
                   <span className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-white/30">Quick facts</span>
                   <span className="text-[0.58rem] font-semibold tabular-nums text-white/20">
-                    {title.tmdbId ? 'TMDB enriched' : 'Local index'}
+                    {title.tmdbId ? 'TMDB enriched' : title.metadataStatus === 'live' ? 'Live catalogue' : 'Local index'}
                   </span>
                 </div>
                 <dl className="divide-y divide-white/[0.05] text-[0.7rem]">
@@ -408,8 +461,8 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                   <div className="flex items-center justify-between px-4 py-2.5">
                     <dt className="text-white/35">Source</dt>
                     <dd className="flex items-center gap-1.5 font-semibold text-white/70">
-                      <span className="h-1 w-1 rounded-full bg-emerald-400" />
-                      Local network
+                      <span className={cn('h-1 w-1 rounded-full', offline ? 'bg-amber-400' : 'bg-emerald-400')} />
+                      {offline ? 'Server offline' : 'Local network'}
                     </dd>
                   </div>
                 </dl>
@@ -431,7 +484,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                 {title.metadataStatus === 'matched' ? <span className="badge">TMDB matched</span> : null}
               </div>
 
-              <h1 className="hero-title mt-4 max-w-[22ch] text-[clamp(2.1rem,4.4vw,3.5rem)] text-white">{title.title}</h1>
+              <h1 className="hero-title mt-4 max-w-[18ch] text-white">{title.title}</h1>
 
               {title.tagline ? (
                 <p className="mt-3 max-w-2xl text-[0.92rem] italic text-white/45">{title.tagline}</p>
@@ -491,11 +544,23 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
               )}
 
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link href={resumeHref} className="btn btn-primary h-12 px-6 text-[0.86rem]">
-                  <Play className="h-4 w-4 fill-current" />
-                  {progress ? 'Resume playback' : isSeries ? 'Play first episode' : 'Play now'}
-                </Link>
-                {progress ? (
+                {playable ? (
+                  <Link href={resumeHref} className="btn btn-primary h-12 px-6 text-[0.86rem]">
+                    <Play className="h-4 w-4 fill-current" />
+                    {progress ? 'Resume playback' : isSeries ? 'Play first episode' : 'Play now'}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="btn btn-primary h-12 cursor-not-allowed px-6 text-[0.86rem] opacity-45"
+                    title={offline ? 'The media server is offline' : 'No playable video was found for this title'}
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    {offline ? 'Server offline' : 'Not available'}
+                  </button>
+                )}
+                {progress && playable ? (
                   <Link href={restartHref} className="btn btn-ghost h-12 px-5 text-[0.82rem]">
                     <RotateCcw className="h-4 w-4" />
                     Start over
@@ -514,16 +579,18 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                   {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                   {saved ? 'In my list' : 'Add to my list'}
                 </button>
-                <a
-                  href={vlcUrl({ titleId: title.id, ...(isSeries && currentEpisode ? { episodeId: currentEpisode.id } : {}) })}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-quiet h-12 px-4 text-[0.8rem]"
-                  title="Open the stream in VLC. Best for MKV/HEVC/AC3 files that browsers cannot decode."
-                >
-                  <MonitorPlay className="h-4 w-4" />
-                  Open in VLC
-                </a>
+                {directPath && !offline ? (
+                  <a
+                    href={vlcUrl({ titleId: title.id, ...(isSeries && currentEpisode ? { episodeId: currentEpisode.id } : {}) })}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-quiet h-12 px-4 text-[0.8rem]"
+                    title="Open the stream in VLC. Best for MKV/HEVC/AC3 files that browsers cannot decode."
+                  >
+                    <MonitorPlay className="h-4 w-4" />
+                    Open in VLC
+                  </a>
+                ) : null}
               </div>
 
               <div className="mt-9 grid gap-2.5 sm:grid-cols-3">
@@ -807,18 +874,25 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
             </button>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" onClick={copyDirectLink} className="btn btn-quiet btn-sm" title="Copy a direct stream link for VLC, mpv or another player">
+              <button type="button" onClick={copyDirectLink} className="btn btn-quiet btn-sm" title="Copy a direct stream link for VLC, mpv or another player" disabled={!directPath || offline}>
                 {stateFor('stream') === 'copied' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {stateFor('stream') === 'copied' ? 'Link copied' : stateFor('stream') === 'failed' ? 'Copy failed' : 'Copy stream link'}
               </button>
-              <a
-                href={vlcUrl({ titleId: title.id, ...(isSeries && currentEpisode ? { episodeId: currentEpisode.id } : {}), download: true })}
-                className="btn btn-quiet btn-sm"
-                title="Download an M3U playlist to open in VLC"
-              >
-                <ListVideo className="h-3.5 w-3.5" />
-                VLC playlist
-              </a>
+              {directPath && !offline ? (
+                <a
+                  href={vlcUrl({ titleId: title.id, ...(isSeries && currentEpisode ? { episodeId: currentEpisode.id } : {}), download: true })}
+                  className="btn btn-quiet btn-sm"
+                  title="Download an M3U playlist to open in VLC"
+                >
+                  <ListVideo className="h-3.5 w-3.5" />
+                  VLC playlist
+                </a>
+              ) : (
+                <span className="btn btn-quiet btn-sm cursor-not-allowed opacity-45" title={offline ? 'The media server is offline' : 'No direct stream path is available'}>
+                  <ListVideo className="h-3.5 w-3.5" />
+                  VLC playlist
+                </span>
+              )}
             </div>
 
             <div className="mt-5 rounded-xl border border-white/[0.055] bg-white/[0.02] p-3">
@@ -846,7 +920,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                 <button
                   type="button"
                   onClick={() => copyM3uLink()}
-                  disabled={!directPath}
+                  disabled={!directPath || offline}
                   className={cn('btn btn-quiet btn-sm w-full', stateFor('m3u') === 'copied' && 'border-emerald-400/25 text-emerald-300')}
                 >
                   {stateFor('m3u') === 'copied' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -859,6 +933,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                     <button
                       type="button"
                       onClick={() => copyM3uLink('season')}
+                      disabled={offline}
                       className={cn('btn btn-quiet btn-sm', stateFor('m3u-season') === 'copied' && 'border-emerald-400/25 text-emerald-300')}
                     >
                       {stateFor('m3u-season') === 'copied' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -867,6 +942,7 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
                     <button
                       type="button"
                       onClick={() => copyM3uLink('series')}
+                      disabled={offline}
                       className={cn('btn btn-quiet btn-sm', stateFor('m3u-series') === 'copied' && 'border-emerald-400/25 text-emerald-300')}
                     >
                       {stateFor('m3u-series') === 'copied' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -917,10 +993,17 @@ export default function DetailsView({ titleId }: DetailsViewProps) {
               </div>
               <div className="surface-rule flex items-center justify-between py-2.5 text-[0.68rem]">
                 <span className="text-white/30">Availability</span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-300/80">
-                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
-                  On your server
-                </span>
+                {offline ? (
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-amber-300/90">
+                    <span className="h-1 w-1 rounded-full bg-amber-400" />
+                    Server offline
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-300/80">
+                    <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                    On your server
+                  </span>
+                )}
               </div>
             </div>
           </div>

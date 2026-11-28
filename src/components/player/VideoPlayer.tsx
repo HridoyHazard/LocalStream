@@ -348,7 +348,7 @@ export default function VideoPlayer({ titleId, episodeId, restart = false }: Vid
   // Probe the container for muxed subtitle streams. This is a header-only
   // ffprobe call, so it is cheap enough to run whenever the source changes.
   useEffect(() => {
-    if (!sourcePath) {
+    if (!sourcePath || title?.availability === 'offline') {
       setEmbeddedLoading(false);
       return;
     }
@@ -381,7 +381,7 @@ export default function VideoPlayer({ titleId, episodeId, restart = false }: Vid
     return () => {
       cancelled = true;
     };
-  }, [sourcePath]);
+  }, [sourcePath, title?.availability]);
 
   const writeProgress = useCallback(
     (video: HTMLVideoElement, completed = false) => {
@@ -912,6 +912,37 @@ export default function VideoPlayer({ titleId, episodeId, restart = false }: Vid
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050506]">
         <LoaderCircle className="h-7 w-7 animate-spin text-accent-400" />
+      </div>
+    );
+  }
+
+  if (!sourcePath || title.availability === 'offline') {
+    const offline = title.availability === 'offline';
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#050506] px-6 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-amber-300">
+          <TriangleAlert className="h-6 w-6" />
+        </div>
+        <h1 className="mt-5 text-xl font-bold tracking-tight text-white">
+          {offline ? 'The media server is offline' : 'This file is unavailable'}
+        </h1>
+        <p className="mt-2 max-w-md text-[0.8rem] leading-relaxed text-white/40">
+          {offline
+            ? `"${title.title}" is in your catalogue, but the server that stores it is not reachable right now. Reconnect to the ISP network and reload the page to start streaming.`
+            : 'LocalStream could not resolve a playable file for this title. It may have moved, or the server may still be listing the folder.'}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={() => void refresh()} className="btn btn-primary btn-sm">
+            <RotateCcw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+          <Link href={detailsHref(title)} className="btn btn-ghost btn-sm">
+            Back to details
+          </Link>
+          <Link href={title.kind === 'series' ? '/series' : '/movies'} className="btn btn-ghost btn-sm">
+            {title.kind === 'series' ? 'Browse series' : 'Browse movies'}
+          </Link>
+        </div>
       </div>
     );
   }

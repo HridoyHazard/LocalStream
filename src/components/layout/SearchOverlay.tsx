@@ -72,6 +72,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
 
   const { data: searchData, loading: searching } = useApi<SuggestResponse>(searchPath, {
     listenForRefresh: false,
+    keepPreviousData: true,
   });
   const { data: popularData, loading: popularLoading } = useApi<BrowseResponse>(popularPath, {
     listenForRefresh: false,

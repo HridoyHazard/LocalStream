@@ -5,6 +5,8 @@ import type { Db } from "./db";
 import { bumpLibraryVersion, getDb, getLastScanAt, getSetting, setSetting } from "./db";
 import { serverConfig } from "./config";
 import { fetchDirectoryListing, type DirectoryListing, type ListingItem, MediaServerError } from "./listing";
+import { isMountReachable } from "./reachability";
+import { sectionForPath } from "./sources";
 import {
   basename,
   decodeEntities,
@@ -157,16 +159,21 @@ function parseMtime(value: string) {
 }
 
 function deriveContext(path: string) {
-  const segments = path.split("/").filter(Boolean);
-  const category = segments[0] || null;
+  // Paths on extra servers start with "~<id>"; the folder names follow it.
+  const all = path.split("/").filter(Boolean);
+  const segments = all[0]?.startsWith("~") ? all.slice(1) : all;
+  const folder = segments[0] || null;
+  const category = sectionForPath(path)?.label ?? folder;
   let language: string | null = null;
-  if (category) {
-    if (/foreign/i.test(category)) {
+  if (folder) {
+    if (/foreign/i.test(folder)) {
       language = segments[1]?.replace(/\s*(?:language|movie|movies)$/i, "").trim() || null;
-    } else if (/bangla|bengali|kolkata/i.test(category)) {
+    } else if (/bangla|bengali|kolkata/i.test(folder)) {
       language = "Bengali";
-    } else if (/english/i.test(category)) {
+    } else if (/english/i.test(folder)) {
       language = "English";
+    } else if (/hindi/i.test(folder)) {
+      language = "Hindi";
     }
   }
   // Explicit language folders can also appear below a generic category.
@@ -423,6 +430,15 @@ export class Scanner {
       const runId = Number(runRow.lastInsertRowid);
 
       try {
+        const rootMount = serverConfig.mounts[0];
+        if (rootMount && !(await isMountReachable(rootMount, true))) {
+          // Fail in ~2.5s instead of letting three 20s listing attempts pile up
+          // and leaving the UI in "Scanning 0 folders" for a minute.
+          throw new MediaServerError(
+            `Cannot reach ${rootMount.url}: the media server is offline`,
+            "unreachable",
+          );
+        }
         const rootListing = await this.fetchWithRetry("", true);
         setState({ phase: "scanning", message: `Connected to ${rootListing.protocol === "h5ai" ? "h5ai directory index" : "HTTP directory index"}` });
         setSetting("server_protocol", rootListing.protocol);

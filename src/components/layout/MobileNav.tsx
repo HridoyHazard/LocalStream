@@ -28,11 +28,19 @@ export default function MobileNav() {
   const [notice, setNotice] = useState<string | null>(null);
   const { data, loading, refresh } = useApi<StatsResponse>('/api/stats');
   const groups = useMemo(() => buildNavGroups(data), [data]);
-  const online = Boolean(data);
+  const online = Boolean(data) && data?.server?.reachable !== false;
+  const statusPending = loading || (Boolean(data) && data?.server?.reachable == null);
   const scanning = Boolean(data?.scan?.running) || syncing;
   const stats = data?.stats;
 
   useBodyScrollLock(sheetOpen);
+
+  // Settle the status label if the first stats response raced the probe.
+  useEffect(() => {
+    if (!data || data.server?.reachable != null) return;
+    const timer = window.setTimeout(() => void refresh(), 2800);
+    return () => window.clearTimeout(timer);
+  }, [data, refresh]);
 
   useEffect(() => {
     setSheetOpen(false);
@@ -192,7 +200,7 @@ export default function MobileNav() {
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 p-3">
                 <span className="flex items-center gap-2 text-[11px] text-neutral-400">
                   <span className={cn('h-2 w-2 rounded-full', online ? 'bg-emerald-400' : 'bg-amber-400')} />
-                  {loading ? 'Connecting…' : online ? 'Server online' : 'Library offline'}
+                  {statusPending ? 'Connecting…' : online ? 'Server online' : 'Media server offline'}
                   {stats?.titles ? <span className="text-neutral-500">· {stats.titles.toLocaleString()} titles</span> : null}
                 </span>
                 <button

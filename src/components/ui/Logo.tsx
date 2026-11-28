@@ -18,21 +18,17 @@ export default function Logo({ href = '/', className, compact = false, showTagli
       <span className={cn('flex flex-col', compact && 'gap-0.5')}>
         <span
           className={cn(
-            'font-sans font-black leading-none tracking-[-0.04em] text-white transition-colors group-hover:text-neutral-200',
-            compact ? 'text-[1.15rem] sm:text-[1.35rem]' : 'text-xl sm:text-2xl',
+            'font-display font-normal leading-none tracking-[0.05em] text-white',
+            compact ? 'text-[1.55rem] sm:text-[1.85rem]' : 'text-[2rem] sm:text-[2.3rem]',
           )}
         >
           LOCAL<span className="text-[#e50914]">STREAM</span>
         </span>
-        {showTagline && (
-          <span className="text-[0.4rem] font-bold uppercase tracking-[0.24em] text-white/35">
-            Personal cinema
-          </span>
-        )}
+        {showTagline && <span className="text-[0.7rem] font-semibold text-white/40">Your own cinema</span>}
       </span>
       {!compact && (
-        <span className="hidden rounded border border-red-500/30 bg-red-600/20 px-1.5 py-0.5 font-mono text-[0.55rem] font-bold uppercase tracking-wider text-red-400 xl:inline-block">
-          LAN
+        <span className="hidden rounded border border-white/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-white/50 xl:inline-block">
+          On your network
         </span>
       )}
     </Link>

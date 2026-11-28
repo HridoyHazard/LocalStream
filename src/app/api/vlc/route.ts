@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/server/db";
 import { mediaUrlForPath } from "@/lib/server/config";
+import {
+  getLiveTitleAvailability,
+  isLiveEpisodeId,
+  isLiveTitleId,
+  resolveLiveEpisode,
+  resolveLiveTitle,
+} from "@/lib/server/live-catalog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -39,7 +46,7 @@ function isSafePath(path: string) {
   return !path.split("/").some((segment) => segment === ".." || segment === ".");
 }
 
-function resolvePlaylist(params: URLSearchParams): Playlist | null {
+async function resolvePlaylist(params: URLSearchParams): Promise<Playlist | null> {
   const db = getDb();
   const episodeId = params.get("episodeId");
   const titleId = params.get("titleId");
@@ -49,6 +56,12 @@ function resolvePlaylist(params: URLSearchParams): Playlist | null {
   const seasonParam = Number.parseInt(params.get("season") ?? "", 10);
 
   if (episodeId) {
+    if (isLiveEpisodeId(episodeId)) {
+      const episode = await resolveLiveEpisode(episodeId);
+      if (!episode) return null;
+      const label = `${episode.title} ${code(episode.season, episode.episode)}`;
+      return { name: label, entries: [{ path: episode.path, label }] };
+    }
     const row = db
       .prepare(
         `SELECT e.path, e.season, e.episode, t.title FROM episodes e
@@ -61,6 +74,33 @@ function resolvePlaylist(params: URLSearchParams): Playlist | null {
   }
 
   if (titleId) {
+    if (isLiveTitleId(titleId)) {
+      const title = await resolveLiveTitle(titleId);
+      if (!title) return null;
+
+      if (scope === "season" || scope === "series") {
+        const bySeason = scope === "season" && Number.isFinite(seasonParam);
+        const episodes = bySeason
+          ? title.episodes.filter((episode) => episode.season === seasonParam)
+          : title.episodes;
+        if (episodes.length) {
+          return {
+            name: bySeason ? `${title.title} Season ${seasonParam}` : title.title,
+            entries: episodes.map((episode) => ({
+              path: episode.path,
+              label: `${title.title} ${code(episode.season, episode.episode)}`,
+            })),
+          };
+        }
+      }
+
+      if (title.filePath) return { name: title.title, entries: [{ path: title.filePath, label: title.title }] };
+      const first = title.episodes[0];
+      if (!first) return null;
+      const label = `${title.title} ${code(first.season, first.episode)}`;
+      return { name: label, entries: [{ path: first.path, label }] };
+    }
+
     const title = db
       .prepare("SELECT id, kind, title, file_path FROM titles WHERE id = ?")
       .get(titleId) as { id: string; kind: string; title: string; file_path: string } | undefined;
@@ -107,8 +147,18 @@ function resolvePlaylist(params: URLSearchParams): Playlist | null {
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const playlist = resolvePlaylist(params);
+  const playlist = await resolvePlaylist(params);
   if (!playlist) {
+    const titleId = params.get("titleId");
+    if (titleId && isLiveTitleId(titleId) && getLiveTitleAvailability(titleId) === "offline") {
+      return NextResponse.json(
+        {
+          error:
+            "The media server for this title is offline. Reconnect to the ISP network, then reload this playlist.",
+        },
+        { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+      );
+    }
     return NextResponse.json(
       {
         error:

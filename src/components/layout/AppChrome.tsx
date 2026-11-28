@@ -1,6 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
+import RouteProgress from '@/components/layout/RouteProgress';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import MobileNav from '@/components/layout/MobileNav';
@@ -19,6 +21,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
+      <Suspense fallback={null}>
+        <RouteProgress />
+      </Suspense>
       {!immersive && <Navbar />}
       <main id="main-content" className={cn('flex min-h-screen flex-col', immersive && 'min-h-screen')}>
         <div key={pathname} className={immersive ? 'flex-1' : 'page-enter flex-1'}>

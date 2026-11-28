@@ -39,3 +39,6 @@ desktop.ini
 
 # Extracted embedded subtitles (regenerated on demand)
 data/subtitles/
+
+# Shallow-crawled catalogs for the extra ISP servers (regenerated on demand)
+data/live-catalog/
